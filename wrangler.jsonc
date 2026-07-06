@@ -1,0 +1,10 @@
+{
+  // Static site served via Cloudflare Workers Assets.
+  // The deploy command (`npx wrangler versions upload`) reads this file to
+  // find the assets directory. All site files live in ./public.
+  "name": "client-analyzer-reframe",
+  "compatibility_date": "2026-07-06",
+  "assets": {
+    "directory": "./public"
+  }
+}
