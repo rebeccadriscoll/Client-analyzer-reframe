@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Client Analyzer · The Reframe</title>
+<title>The Client Analyzer · Rebecca Driscoll, CPA</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 64 64%22%3E%3Crect width%3D%2264%22 height%3D%2264%22 rx%3D%2214%22 fill%3D%22%23F47A6A%22%2F%3E%3Ctext x%3D%2232%22 y%3D%2249%22 font-family%3D%22Georgia%2Cserif%22 font-weight%3D%22800%22 font-style%3D%22italic%22 font-size%3D%2244%22 fill%3D%22white%22 text-anchor%3D%22middle%22%3ER%3C%2Ftext%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1011,7 +1011,7 @@
         <div class="brand">
           <div class="brand-mark">R</div>
           <div>
-            <div class="brand-name">The Reframe</div>
+            <div class="brand-name">Rebecca Driscoll, CPA</div>
             <div class="brand-tag">The Client Analyzer</div>
           </div>
         </div>
@@ -1792,7 +1792,7 @@
 
     <footer>
       Built for firm owners who want the math to win.<br>
-      The Reframe · Rebecca Driscoll, CPA · <a href="https://thereframe.co" target="_blank">thereframe.co</a>
+      Rebecca Driscoll, CPA · <a href="https://rdriscollcpa.com" target="_blank">rdriscollcpa.com</a>
     </footer>
   </div>
 
@@ -2391,12 +2391,12 @@ function renderConfidence(totalCurrent, totalNew, counts) {
     // Even losing the biggest one would put us under
     el.innerHTML = `If <strong>${escapeHtml(biggestName)}</strong> walks (${fmt(biggestRev)}/yr), I'd dip below my current revenue of <strong>${fmt(totalCurrent)}/yr</strong>. That means my raises need to be higher, OR I need to make peace with this being a transition year. Either way \u2014 <em>knowing the math is the first step.</em>`;
   } else if (canLoseCount >= sorted.length) {
-    el.innerHTML = `Even if <strong>every single raise client walks</strong> (all ${sorted.length}, worth ${fmt(canLoseRevenue)}/yr), I will <em>still match</em> my current revenue of <strong>${fmt(totalCurrent)}/yr</strong>. The math is firmly on my side. <em>The boundary is the service.</em>`;
+    el.innerHTML = `Even if <strong>every single raise client walks</strong> (all ${sorted.length}, worth ${fmt(canLoseRevenue)}/yr), I will <em>still match</em> my current revenue of <strong>${fmt(totalCurrent)}/yr</strong>. The math is firmly on my side.`;
   } else {
     // The "next biggest" client — the one whose loss WOULD finally tip us under
     const tipper = sorted[canLoseCount];
     const tipperName = tipper && tipper.name ? tipper.name : `client #${canLoseCount + 1}`;
-    el.innerHTML = `Even if my <strong>${canLoseCount} biggest raise client${canLoseCount===1?'':'s'}</strong> all walk \u2014 worth <strong>${fmt(canLoseRevenue)}/yr</strong> \u2014 I will <em>still match</em> my current revenue of <strong>${fmt(totalCurrent)}/yr</strong>. The math is on my side. <em>The boundary is the service.</em>`;
+    el.innerHTML = `Even if my <strong>${canLoseCount} biggest raise client${canLoseCount===1?'':'s'}</strong> all walk \u2014 worth <strong>${fmt(canLoseRevenue)}/yr</strong> \u2014 I will <em>still match</em> my current revenue of <strong>${fmt(totalCurrent)}/yr</strong>. The math is on my side.`;
   }
 }
 
