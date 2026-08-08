@@ -1,6 +1,6 @@
 import type {
   Env, Firm, Client, Tier, Action, Decision,
-  Wave, WaveType, WaveStatus, Commitment, CommitmentState,
+  Wave, WaveType, WaveStatus, Commitment, CommitmentState, VoiceSample,
 } from "./types";
 import { randomToken, sha256Hex } from "./crypto";
 
@@ -338,6 +338,40 @@ export async function getCommitmentContextByToken(
     .first<Decision>();
   if (!client || !decision) return null;
   return { commitment, client, decision };
+}
+
+// ---- voice samples (The Words) ----
+
+/** Store a message the owner wrote as a voice example. */
+export async function addVoiceSample(
+  env: Env,
+  firmId: string,
+  action: Action | null,
+  message: string
+): Promise<void> {
+  await env.DB.prepare(
+    "INSERT INTO voice_sample (id, firm_id, action, message, created_at) VALUES (?, ?, ?, ?, ?)"
+  )
+    .bind(crypto.randomUUID(), firmId, action, message, Date.now())
+    .run();
+}
+
+/** The most recent voice examples for a firm (newest first). */
+export async function getVoiceSamples(env: Env, firmId: string, limit = 4): Promise<VoiceSample[]> {
+  const res = await env.DB.prepare(
+    "SELECT * FROM voice_sample WHERE firm_id = ? ORDER BY created_at DESC LIMIT ?"
+  )
+    .bind(firmId, limit)
+    .all<VoiceSample>();
+  return res.results ?? [];
+}
+
+/** How many voice examples a firm has taught. */
+export async function countVoiceSamples(env: Env, firmId: string): Promise<number> {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM voice_sample WHERE firm_id = ?")
+    .bind(firmId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 /** Public state change from the confirm page. */

@@ -1,4 +1,4 @@
-import type { Env, Client, Decision, Action } from "./types";
+import type { Env, Client, Decision, Action, VoiceSample } from "./types";
 
 /** Voice guardrail: never appear in generated client-facing copy. */
 const BANNED_WORDS = ["honestly", "quietly", "genuinely", "straightforward"];
@@ -83,35 +83,91 @@ export function templateWords(client: Client, action: Action, newFee: number | n
   }
 }
 
-function voicePrompt(client: Client, decision: Decision): string {
-  return (
-    `Write a short, warm, plain email from an accountant to a client named "${client.name}".\n` +
-    `The message is a "${decision.action}" message` +
-    (decision.action === "raise" && decision.new_fee != null ? ` with a new annual fee of ${money(decision.new_fee)}` : "") +
-    `.\n` +
-    `Hard rules: no em dashes anywhere. Do not use the words honestly, quietly, genuinely, or ` +
-    `straightforward. Keep it under 120 words, end with "Best,". Return only the message text.`
-  );
+/**
+ * Generate a draft. The default is the deterministic, always-compliant template
+ * (this is the "suggested message"). Once the owner has taught their voice (one
+ * or more saved samples) and an Anthropic key is set, Claude redrafts in their
+ * voice instead. Output always runs through sanitizeVoice, and any failure falls
+ * back to the template. The prompt stays server-side.
+ */
+export async function generateWords(
+  env: Env,
+  client: Client,
+  decision: Decision,
+  samples: VoiceSample[] = []
+): Promise<string> {
+  if (env.ANTHROPIC_API_KEY && samples.length > 0) {
+    try {
+      const text = await draftWithClaude(env, client, decision, samples);
+      if (text.trim().length > 20) return sanitizeVoice(text.trim());
+    } catch {
+      /* fall back to template */
+    }
+  }
+  return sanitizeVoice(templateWords(client, decision.action, decision.new_fee));
 }
 
-/**
- * Generate a draft. Templates are the default (always voice-compliant); when a
- * Workers AI binding is present, an optional single call may replace the draft,
- * and the result is still run through sanitizeVoice. Any failure falls back to
- * the template. The prompt stays server-side.
- */
-export async function generateWords(env: Env, client: Client, decision: Decision): Promise<string> {
-  const base = templateWords(client, decision.action, decision.new_fee);
-  if (!env.AI) return sanitizeVoice(base);
-
-  try {
-    const out = (await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-      messages: [{ role: "user", content: voicePrompt(client, decision) }],
-    })) as { response?: string };
-    const text = (out?.response ?? "").trim();
-    if (text.length > 20) return sanitizeVoice(text);
-  } catch {
-    /* fall back to template */
+/** What we are asking Claude to write, per action. */
+function draftAsk(client: Client, decision: Decision): string {
+  const name = client.name;
+  switch (decision.action) {
+    case "raise":
+      return (
+        `a fee-increase email to ${name}` +
+        (decision.new_fee != null ? `, setting their new annual fee at ${money(decision.new_fee)}` : "") +
+        `. The scope of work stays the same.`
+      );
+    case "keep":
+      return `a warm note to ${name} that nothing changes and you are glad to keep working together.`;
+    case "nudge":
+      return `an email to ${name} proposing a couple of small changes so the working relationship runs more smoothly, while staying on.`;
+    case "fire":
+      return `a kind note to ${name} that you are stepping back and will not continue past this year, offering a smooth handoff.`;
   }
-  return sanitizeVoice(base);
+}
+
+/** Draft in the owner's voice using Claude, with their samples as style examples. */
+async function draftWithClaude(
+  env: Env,
+  client: Client,
+  decision: Decision,
+  samples: VoiceSample[]
+): Promise<string> {
+  const model = env.DRAFT_MODEL || "claude-haiku-4-5-20251001";
+  const system =
+    "You draft short, warm, plain client emails on behalf of an accountant. " +
+    "Match the accountant's own writing voice, shown in the examples the user gives you: their greeting, " +
+    "rhythm, warmth, and sign-off. Hard rules you must never break: no em dashes or en dashes anywhere; " +
+    "never use the words honestly, quietly, genuinely, or straightforward. Keep it under 130 words. " +
+    "Return only the message text, with no preamble or explanation.";
+
+  const examples = samples
+    .map((s, i) => `Example ${i + 1} of how I write:\n${s.message}`)
+    .join("\n\n");
+  const userContent = `${examples}\n\nNow, in my voice, write ${draftAsk(client, decision)}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": env.ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 600,
+      system,
+      messages: [{ role: "user", content: userContent }],
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Anthropic draft failed (${res.status}): ${detail}`);
+  }
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  return (data.content ?? [])
+    .filter((b) => b.type === "text")
+    .map((b) => b.text ?? "")
+    .join("");
 }
