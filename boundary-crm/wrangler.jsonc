@@ -17,8 +17,7 @@
     {
       "binding": "DB",
       "database_name": "boundary_crm",
-      // Run `npm run db:create` and paste the returned id here before deploying.
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "f7427aec-5bd6-4caa-ba8a-7d60bdc09ac5",
       "migrations_dir": "migrations"
     }
   ],
