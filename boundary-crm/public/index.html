@@ -5,27 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Boundary CRM · Rebecca Driscoll, CPA</title>
 <meta name="description" content="Boundary CRM — decide who to keep, raise, nudge, and let go, one client at a time.">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 64 64%22%3E%3Crect width%3D%2264%22 height%3D%2264%22 rx%3D%2214%22 fill%3D%22%236D5AE0%22%2F%3E%3Ctext x%3D%2232%22 y%3D%2249%22 font-family%3D%22Georgia%2Cserif%22 font-weight%3D%22800%22 font-style%3D%22italic%22 font-size%3D%2244%22 fill%3D%22white%22 text-anchor%3D%22middle%22%3EB%3C%2Ftext%3E%3C%2Fsvg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 64 64%22%3E%3Crect width%3D%2264%22 height%3D%2264%22 rx%3D%2214%22 fill%3D%22%23F47A6A%22%2F%3E%3Ctext x%3D%2232%22 y%3D%2249%22 font-family%3D%22Georgia%2Cserif%22 font-weight%3D%22800%22 font-style%3D%22italic%22 font-size%3D%2244%22 fill%3D%22white%22 text-anchor%3D%22middle%22%3EB%3C%2Ftext%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,600;1,9..144,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --violet: #6D5AE0;
-    --violet-deep: #4B3BC4;
-    --violet-soft: rgba(109, 90, 224, 0.12);
-    --plum: #2A2350;
-    --plum-deep: #1C1738;
+    --coral: #F47A6A;
+    --coral-deep: #C44536;
+    --coral-soft: rgba(244, 122, 106, 0.12);
+    --navy: #1F3A3D;
+    --navy-deep: #15282B;
     --cream: #FAF3E7;
     --cream-deep: #F2E8D5;
-    --gold: #F5C451;
+    --yellow: #F5D061;
     --teal: #2D6A6B;
     --ink: #1A1A1A;
     --gray: #6B6B6B;
     --gray-light: #D4CFC4;
-    --shadow-sm: 0 2px 8px rgba(42, 35, 80, 0.08);
-    --shadow-md: 0 4px 20px rgba(42, 35, 80, 0.12);
-    --shadow-lg: 0 12px 40px rgba(42, 35, 80, 0.18);
+    --shadow-sm: 0 2px 8px rgba(31, 58, 61, 0.08);
+    --shadow-md: 0 4px 20px rgba(31, 58, 61, 0.12);
+    --shadow-lg: 0 12px 40px rgba(31, 58, 61, 0.18);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,13 +36,13 @@
     color: var(--ink);
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
-    background-image: radial-gradient(circle at 1px 1px, rgba(42, 35, 80, 0.06) 1px, transparent 0);
+    background-image: radial-gradient(circle at 1px 1px, rgba(31, 58, 61, 0.06) 1px, transparent 0);
     background-size: 24px 24px;
   }
 
   .shape { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; }
-  .shape-1 { top: -120px; right: -120px; width: 360px; height: 360px; background: var(--violet); opacity: 0.12; }
-  .shape-2 { bottom: -200px; left: -100px; width: 480px; height: 480px; background: var(--gold); opacity: 0.10; }
+  .shape-1 { top: -120px; right: -120px; width: 360px; height: 360px; background: var(--coral); opacity: 0.12; }
+  .shape-2 { bottom: -200px; left: -100px; width: 480px; height: 480px; background: var(--yellow); opacity: 0.10; }
 
   .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
 
@@ -54,33 +54,33 @@
   .gate-card {
     background: white; border-radius: 24px; box-shadow: var(--shadow-lg);
     padding: 40px 32px; max-width: 420px; width: 100%;
-    border: 1px solid rgba(42, 35, 80, 0.08);
+    border: 1px solid rgba(31, 58, 61, 0.08);
   }
   .gate-mark {
-    width: 52px; height: 52px; background: var(--violet); border-radius: 14px;
+    width: 52px; height: 52px; background: var(--coral); border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
     font-family: 'Fraunces', serif; font-weight: 800; font-style: italic; color: white; font-size: 26px;
     box-shadow: var(--shadow-sm); margin-bottom: 20px;
   }
   .gate-card h1 {
     font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700;
-    color: var(--plum); letter-spacing: -0.01em; line-height: 1.1; margin-bottom: 10px;
+    color: var(--navy); letter-spacing: -0.01em; line-height: 1.1; margin-bottom: 10px;
   }
-  .gate-card h1 em { font-style: italic; color: var(--violet-deep); }
+  .gate-card h1 em { font-style: italic; color: var(--coral-deep); }
   .gate-sub { font-size: 15px; color: var(--gray); margin-bottom: 26px; }
   .field-label { font-size: 12px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
   .field-input {
     width: 100%; padding: 15px 16px; font-size: 16px; font-family: 'Inter';
     border: 1.5px solid var(--gray-light); border-radius: 12px; background: var(--cream);
-    color: var(--plum); outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    color: var(--navy); outline: none; transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .field-input:focus { border-color: var(--violet); box-shadow: 0 0 0 4px var(--violet-soft); }
+  .field-input:focus { border-color: var(--coral); box-shadow: 0 0 0 4px var(--coral-soft); }
   .btn-primary {
     width: 100%; margin-top: 16px; padding: 15px 20px; font-size: 16px; font-weight: 600;
-    font-family: 'Inter'; color: white; background: var(--violet); border: none;
+    font-family: 'Inter'; color: white; background: var(--coral); border: none;
     border-radius: 12px; cursor: pointer; transition: background 0.2s, transform 0.1s;
   }
-  .btn-primary:hover { background: var(--violet-deep); }
+  .btn-primary:hover { background: var(--coral-deep); }
   .btn-primary:active { transform: translateY(1px); }
   .btn-primary:disabled { opacity: 0.6; cursor: default; }
   .gate-note { font-size: 12px; color: var(--gray); margin-top: 18px; line-height: 1.5; }
@@ -95,20 +95,20 @@
   .gate-sent.show { display: block; }
   .gate-form.hide { display: none; }
   .sent-icon {
-    width: 52px; height: 52px; border-radius: 14px; background: var(--violet-soft);
+    width: 52px; height: 52px; border-radius: 14px; background: var(--coral-soft);
     display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 20px;
   }
   .dev-link-box {
     margin-top: 18px; padding: 14px; border-radius: 12px;
-    background: #FFF6DC; border: 1px dashed var(--gold);
+    background: #FFF6DC; border: 1px dashed var(--yellow);
   }
   .dev-link-box .tag {
     font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
     color: #9A7B12; margin-bottom: 8px; display: block;
   }
-  .dev-link-box a { color: var(--violet-deep); font-weight: 600; font-size: 14px; word-break: break-all; }
+  .dev-link-box a { color: var(--coral-deep); font-weight: 600; font-size: 14px; word-break: break-all; }
   .link-btn {
-    background: none; border: none; color: var(--violet-deep); font-weight: 600;
+    background: none; border: none; color: var(--coral-deep); font-weight: 600;
     font-size: 14px; cursor: pointer; padding: 0; margin-top: 14px; text-decoration: underline;
   }
 
@@ -116,38 +116,38 @@
   .app { display: none; }
   .app.show { display: block; }
 
-  header { padding: 28px 0 20px; border-bottom: 1px solid rgba(42, 35, 80, 0.08); margin-bottom: 28px; }
+  header { padding: 28px 0 20px; border-bottom: 1px solid rgba(31, 58, 61, 0.08); margin-bottom: 28px; }
   .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; }
   .brand { display: flex; align-items: center; gap: 13px; }
   .brand-mark {
-    width: 42px; height: 42px; background: var(--violet); border-radius: 12px;
+    width: 42px; height: 42px; background: var(--coral); border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     font-family: 'Fraunces', serif; font-weight: 800; font-style: italic; color: white; font-size: 21px;
     box-shadow: var(--shadow-sm);
   }
-  .brand-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; color: var(--plum); }
+  .brand-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; color: var(--navy); }
   .brand-tag { font-size: 13px; color: var(--gray); margin-top: 1px; }
   .header-right { display: flex; align-items: center; gap: 16px; }
   .who { font-size: 13px; color: var(--gray); }
-  .who b { color: var(--plum); font-weight: 600; }
+  .who b { color: var(--navy); font-weight: 600; }
   .logout-btn {
     background: none; border: 1px solid var(--gray-light); color: var(--gray);
     font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 100px; cursor: pointer;
     font-family: 'Inter'; transition: all 0.2s;
   }
-  .logout-btn:hover { border-color: var(--violet); color: var(--violet-deep); }
+  .logout-btn:hover { border-color: var(--coral); color: var(--coral-deep); }
 
   .hero { margin-bottom: 28px; max-width: 760px; }
   .hero-eyebrow {
     display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
-    color: var(--violet-deep); background: var(--violet-soft);
+    color: var(--coral-deep); background: var(--coral-soft);
     padding: 6px 14px; border-radius: 100px; margin-bottom: 16px;
   }
   .hero h2 {
     font-family: 'Fraunces', serif; font-size: clamp(28px, 5vw, 44px);
-    font-weight: 700; line-height: 1.05; color: var(--plum); letter-spacing: -0.02em; margin-bottom: 12px;
+    font-weight: 700; line-height: 1.05; color: var(--navy); letter-spacing: -0.02em; margin-bottom: 12px;
   }
-  .hero h2 em { font-style: italic; color: var(--violet-deep); }
+  .hero h2 em { font-style: italic; color: var(--coral-deep); }
   .hero-sub { font-size: 16px; color: var(--gray); max-width: 600px; }
 
   /* TAB NAV */
@@ -160,10 +160,10 @@
     cursor: pointer; font-family: 'Inter'; font-size: 13px; font-weight: 600; color: var(--gray);
     white-space: nowrap; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .tabnav button .num { font-family: 'Fraunces', serif; font-style: italic; color: var(--violet-deep); font-size: 13px; }
+  .tabnav button .num { font-family: 'Fraunces', serif; font-style: italic; color: var(--coral-deep); font-size: 13px; }
   .tabnav button:hover { background: var(--cream-deep); }
-  .tabnav button.active { background: var(--plum); color: white; }
-  .tabnav button.active .num { color: var(--gold); }
+  .tabnav button.active { background: var(--navy); color: white; }
+  .tabnav button.active .num { color: var(--yellow); }
 
   /* PANELS */
   .panel { display: none; }
@@ -172,35 +172,35 @@
 
   .section-header {
     display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px;
-    flex-wrap: wrap; gap: 14px; border-bottom: 2px solid var(--plum); padding-bottom: 14px;
+    flex-wrap: wrap; gap: 14px; border-bottom: 2px solid var(--navy); padding-bottom: 14px;
   }
   .section-num {
     font-family: 'Fraunces', serif; font-style: italic; font-size: 13px;
-    color: var(--violet-deep); margin-bottom: 4px; display: block; letter-spacing: 0.5px;
+    color: var(--coral-deep); margin-bottom: 4px; display: block; letter-spacing: 0.5px;
   }
-  .section-title { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; color: var(--plum); letter-spacing: -0.01em; }
+  .section-title { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; color: var(--navy); letter-spacing: -0.01em; }
   .section-help { font-size: 14px; color: var(--gray); max-width: 360px; }
 
   .placeholder {
     background: white; border-radius: 20px; padding: 40px 32px; box-shadow: var(--shadow-sm);
-    border: 1px solid rgba(42, 35, 80, 0.08); text-align: center;
+    border: 1px solid rgba(31, 58, 61, 0.08); text-align: center;
   }
   .placeholder .icon {
-    width: 64px; height: 64px; border-radius: 18px; background: var(--violet-soft);
+    width: 64px; height: 64px; border-radius: 18px; background: var(--coral-soft);
     display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 18px;
   }
-  .placeholder h3 { font-family: 'Fraunces', serif; font-size: 22px; color: var(--plum); margin-bottom: 10px; }
+  .placeholder h3 { font-family: 'Fraunces', serif; font-size: 22px; color: var(--navy); margin-bottom: 10px; }
   .placeholder p { font-size: 15px; color: var(--gray); max-width: 440px; margin: 0 auto 8px; }
   .step-chip {
     display: inline-block; margin-top: 18px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
-    color: var(--violet-deep); background: var(--violet-soft); padding: 6px 14px; border-radius: 100px;
+    color: var(--coral-deep); background: var(--coral-soft); padding: 6px 14px; border-radius: 100px;
   }
 
   footer {
-    margin-top: 48px; padding: 24px 0 40px; border-top: 1px solid rgba(42, 35, 80, 0.08);
+    margin-top: 48px; padding: 24px 0 40px; border-top: 1px solid rgba(31, 58, 61, 0.08);
     font-size: 13px; color: var(--gray); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
   }
-  footer a { color: var(--violet-deep); text-decoration: none; font-weight: 600; }
+  footer a { color: var(--coral-deep); text-decoration: none; font-weight: 600; }
 
   @media (max-width: 640px) {
     .gate-card { padding: 32px 24px; }

@@ -48,14 +48,14 @@ export async function sendMagicLink(env: Env, email: string, link: string): Prom
 function magicEmailHtml(link: string): string {
   return `<!doctype html>
 <html>
-  <body style="margin:0;background:#FAF3E7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#2A2350;">
+  <body style="margin:0;background:#FAF3E7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1F3A3D;">
     <div style="max-width:480px;margin:0 auto;padding:40px 24px;">
-      <div style="font-size:20px;font-weight:700;color:#4B3BC4;margin-bottom:8px;">Boundary CRM</div>
+      <div style="font-size:20px;font-weight:700;color:#C44536;margin-bottom:8px;">Boundary CRM</div>
       <p style="font-size:16px;line-height:1.5;">Tap the button to sign in. This link expires in 15 minutes and works once.</p>
       <p style="margin:28px 0;">
-        <a href="${link}" style="display:inline-block;background:#6D5AE0;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 24px;border-radius:12px;">Sign in to Boundary CRM</a>
+        <a href="${link}" style="display:inline-block;background:#F47A6A;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 24px;border-radius:12px;">Sign in to Boundary CRM</a>
       </p>
-      <p style="font-size:13px;color:#6B6B6B;line-height:1.5;">If the button does not work, paste this link into your browser:<br><span style="color:#4B3BC4;word-break:break-all;">${link}</span></p>
+      <p style="font-size:13px;color:#6B6B6B;line-height:1.5;">If the button does not work, paste this link into your browser:<br><span style="color:#C44536;word-break:break-all;">${link}</span></p>
       <p style="font-size:13px;color:#6B6B6B;">If you did not request this, you can ignore this email.</p>
     </div>
   </body>
