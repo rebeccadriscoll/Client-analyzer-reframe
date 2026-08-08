@@ -17,6 +17,11 @@ export interface Env {
   /** Sender for the sign-in email, e.g. "Boundary CRM <login@yourfirm.com>".
    *  The address must be a verified sender/domain in Brevo. */
   MAIL_FROM?: string;
+  /** Anthropic API key. When set (and voice samples exist), The Words drafts
+   *  messages in the owner's learned voice via Claude. */
+  ANTHROPIC_API_KEY?: string;
+  /** Claude model id for voice drafting. Defaults to a Haiku model. */
+  DRAFT_MODEL?: string;
   /** Public base URL used to build sign-in links. Falls back to the request origin. */
   APP_URL?: string;
 }
@@ -44,6 +49,14 @@ export interface Wave {
   type: WaveType;
   send_date: string | null;
   status: WaveStatus;
+}
+
+export interface VoiceSample {
+  id: string;
+  firm_id: string;
+  action: Action | null;
+  message: string;
+  created_at: number;
 }
 
 export type CommitmentState = "told" | "silent" | "agreed" | "declined";

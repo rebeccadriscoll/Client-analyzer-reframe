@@ -64,6 +64,22 @@ the client name and, for raises, the old and new fee.
 Backed by `POST /api/words/generate` (`{ client_id }` → draft) and `POST /api/words/save`
 (`{ client_id, message }`), both firm-scoped and requiring an existing decision.
 
+### Learn my voice (Claude)
+
+If the owner rewrites a message in their own words, they can tap **"Draft the rest in my
+voice"**: that wording is stored as a voice sample, and every other client's message is
+redrafted to match their style. Drafting uses **Claude** (`DRAFT_MODEL`, default Haiku)
+via the Anthropic API, with the saved samples as few-shot style examples. The house voice
+rules still run on the output (no em/en dashes; none of the banned words).
+
+- No Anthropic key, or no samples yet → drafts use the built-in template (the "suggested
+  message"), so there is zero LLM cost until the owner opts in by teaching a sample.
+- Only the client's name/fee and the owner's own samples are sent to Anthropic.
+- Endpoints: `GET /api/voice` (sample count + ready state) and `POST /api/voice/teach`
+  (`{ client_id, message }`, saves the message and adds a voice sample).
+
+Set it up with an `ANTHROPIC_API_KEY` secret on the Worker (from console.anthropic.com).
+
 ## Guided decisions (Step 3)
 
 Clients sort by realized rate (lowest first, where the raise/let-go calls usually are)

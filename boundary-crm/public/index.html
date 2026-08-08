@@ -493,6 +493,14 @@
   .word-status.saved { color: var(--tier-a); }
   .word-status.unsaved { color: var(--tier-c); }
 
+  .voice-banner { font-size: 13px; line-height: 1.5; border-radius: 12px; padding: 12px 16px; margin-bottom: 18px; }
+  .voice-banner.on { background: var(--coral-soft); color: var(--navy); }
+  .voice-banner.on b { color: var(--coral-deep); }
+  .voice-banner.warn { background: rgba(245, 208, 97, 0.22); color: #8A6D10; }
+  .voice-banner.busy { background: var(--cream-deep); color: var(--gray); }
+  .act-voice { color: var(--coral-deep) !important; }
+  .act-voice:disabled { opacity: 0.45; cursor: default; }
+
   /* ===== ROLLOUT (waves) ===== */
   .wave-card {
     background: white; border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm);
@@ -801,6 +809,7 @@
         </div>
 
         <div id="wordsMain" style="display:none;">
+          <div class="voice-banner" id="voiceBanner" style="display:none;"></div>
           <div class="words-filter" id="wordsFilter"></div>
           <div id="wordsList"></div>
         </div>
@@ -1608,16 +1617,17 @@
   });
 
   // ---- the words (Section 03) ----
-  var words = { items: [], filter: 'all' };
+  var words = { items: [], filter: 'all', voiceCount: 0, voiceReady: false };
   var WORD_LABEL = { keep: 'Keep', raise: 'Raise', nudge: 'Nudge', fire: 'Let go' };
 
   async function loadWords() {
     try {
-      var results = await Promise.all([fetch('/api/clients'), fetch('/api/decisions')]);
+      var results = await Promise.all([fetch('/api/clients'), fetch('/api/decisions'), fetch('/api/voice')]);
       if (!results[0].ok) return;
       var clients = (await results[0].json()).clients || [];
       var byId = {}; clients.forEach(function (c) { byId[c.id] = c; });
       var decisions = results[1].ok ? ((await results[1].json()).decisions || []) : [];
+      if (results[2].ok) { var v = await results[2].json(); words.voiceCount = v.count || 0; words.voiceReady = !!v.ready; }
       words.items = decisions.map(function (d) { return { client: byId[d.client_id], decision: d }; })
         .filter(function (x) { return x.client; });
       renderWords();
@@ -1629,11 +1639,32 @@
     var main = document.getElementById('wordsMain');
     if (words.items.length === 0) { empty.style.display = 'block'; main.style.display = 'none'; return; }
     empty.style.display = 'none'; main.style.display = 'block';
+    renderVoiceBanner();
     renderWordsFilter();
     var list = document.getElementById('wordsList');
     list.innerHTML = '';
     var items = words.filter === 'all' ? words.items : words.items.filter(function (x) { return x.decision.action === words.filter; });
     items.forEach(function (x) { list.appendChild(wordCard(x)); });
+  }
+
+  function renderVoiceBanner() {
+    var el = document.getElementById('voiceBanner');
+    if (words.voiceCount > 0 && words.voiceReady) {
+      el.style.display = 'block'; el.className = 'voice-banner on';
+      el.innerHTML = '✨ Drafting in <b>your voice</b>, learned from ' + words.voiceCount +
+        ' of your message' + (words.voiceCount === 1 ? '' : 's') +
+        '. Rewrite any message and tap “Draft the rest in my voice” to teach it more.';
+    } else if (words.voiceCount > 0 && !words.voiceReady) {
+      el.style.display = 'block'; el.className = 'voice-banner warn';
+      el.innerHTML = 'Voice learning is on (' + words.voiceCount + ' saved), but add your <b>ANTHROPIC_API_KEY</b> secret to the Worker to activate Claude drafting.';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  function setVoiceBannerBusy(msg) {
+    var el = document.getElementById('voiceBanner');
+    el.style.display = 'block'; el.className = 'voice-banner busy'; el.textContent = msg;
   }
 
   function renderWordsFilter() {
@@ -1656,6 +1687,7 @@
     var c = x.client, d = x.decision;
     var card = document.createElement('div');
     card.className = 'word-card';
+    card.dataset.cid = c.id;
     var sub = (d.action === 'raise' && d.new_fee != null) ? ('New fee ' + money(d.new_fee)) : (c.entity_type || '');
     card.innerHTML =
       '<div class="word-head">' +
@@ -1668,6 +1700,7 @@
       '<textarea class="word-text" placeholder="No draft yet. Tap Draft message to write one."></textarea>' +
       '<div class="word-actions">' +
         '<button class="btn btn-secondary act-draft"></button>' +
+        '<button class="btn btn-ghost act-voice" title="Save this wording as your voice and redraft the others to match">Draft the rest in my voice</button>' +
         '<button class="btn btn-ghost act-copy">Copy</button>' +
         '<button class="btn btn-primary act-save" disabled>Save</button>' +
         '<span class="word-status"></span>' +
@@ -1677,18 +1710,29 @@
     var ta = card.querySelector('.word-text');
     var saveBtn = card.querySelector('.act-save');
     var draftBtn = card.querySelector('.act-draft');
+    var voiceBtn = card.querySelector('.act-voice');
     var status = card.querySelector('.word-status');
     ta.value = d.drafted_message || '';
     draftBtn.textContent = d.drafted_message ? 'Regenerate' : 'Draft message';
     if (d.drafted_message) { status.className = 'word-status saved'; status.textContent = 'Saved'; }
+    voiceBtn.disabled = ta.value.trim().length < 10;
 
     function markUnsaved() {
       var empty = ta.value.trim() === '';
       saveBtn.disabled = empty;
+      voiceBtn.disabled = ta.value.trim().length < 10;
       status.className = 'word-status unsaved';
       status.textContent = empty ? '' : 'Unsaved changes';
     }
     ta.addEventListener('input', markUnsaved);
+
+    voiceBtn.addEventListener('click', async function () {
+      if (ta.value.trim().length < 10) return;
+      var prev = voiceBtn.textContent;
+      voiceBtn.disabled = true; voiceBtn.textContent = 'Learning…';
+      await teachAndDraftRest(c.id, ta.value);
+      voiceBtn.textContent = prev;
+    });
 
     draftBtn.addEventListener('click', async function () {
       var prev = draftBtn.textContent;
@@ -1724,6 +1768,46 @@
     });
 
     return card;
+  }
+
+  // Save the owner's own wording as a voice sample, then redraft every other
+  // client's message to match, filling their boxes (unsaved) for review.
+  async function teachAndDraftRest(clientId, message) {
+    try {
+      var res = await fetch('/api/voice/teach', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: clientId, message: message })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) return;
+      words.voiceCount = data.count || words.voiceCount;
+      words.voiceReady = !!data.ready;
+    } catch (e) { return; }
+
+    // Mark the taught message saved, show all cards, then redraft the others.
+    words.items.forEach(function (it) { if (it.client.id === clientId) it.decision.drafted_message = message; });
+    words.filter = 'all';
+    renderWords();
+    setVoiceBannerBusy('Drafting the rest in your voice…');
+
+    for (var i = 0; i < words.items.length; i++) {
+      var it = words.items[i];
+      if (it.client.id === clientId) continue;
+      try {
+        var g = await fetch('/api/words/generate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: it.client.id })
+        });
+        var gd = await g.json().catch(function () { return {}; });
+        if (g.ok && gd.message) {
+          var card = document.querySelector('#wordsList .word-card[data-cid="' + it.client.id + '"]');
+          if (card) {
+            var box = card.querySelector('.word-text');
+            box.value = gd.message;
+            box.dispatchEvent(new Event('input'));
+          }
+        }
+      } catch (e) { /* skip this one */ }
+    }
+    renderVoiceBanner();
   }
 
   // ---- rollout + tracker (Sections 04 and 05) ----

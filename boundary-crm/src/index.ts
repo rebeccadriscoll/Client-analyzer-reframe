@@ -22,6 +22,9 @@ import {
   upsertCommitment,
   getCommitmentContextByToken,
   setCommitmentStateByToken,
+  getVoiceSamples,
+  addVoiceSample,
+  countVoiceSamples,
   type NewClient,
 } from "./db";
 import type { Action, WaveType, WaveStatus, CommitmentState } from "./types";
@@ -84,6 +87,12 @@ export default {
       }
       if (pathname === "/api/words/save" && request.method === "POST") {
         return await handleWordsSave(request, env);
+      }
+      if (pathname === "/api/voice" && request.method === "GET") {
+        return await handleVoiceStatus(request, env);
+      }
+      if (pathname === "/api/voice/teach" && request.method === "POST") {
+        return await handleVoiceTeach(request, env);
       }
       if (pathname === "/api/rollout" && request.method === "GET") {
         return await handleRollout(request, env);
@@ -344,8 +353,43 @@ async function handleWordsGenerate(request: Request, env: Env): Promise<Response
   const decision = await getDecisionForClient(env, firm.id, clientId);
   if (!decision) return json({ error: "no_decision" }, 400);
 
-  const message = await generateWords(env, client, decision);
-  return json({ message });
+  const samples = await getVoiceSamples(env, firm.id);
+  const message = await generateWords(env, client, decision, samples);
+  return json({ message, inVoice: samples.length > 0 && !!env.ANTHROPIC_API_KEY });
+}
+
+/** GET /api/voice — how many voice samples the firm has taught. */
+async function handleVoiceStatus(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const count = await countVoiceSamples(env, firm.id);
+  return json({ count, ready: count > 0 && !!env.ANTHROPIC_API_KEY });
+}
+
+/** POST /api/voice/teach { client_id, message } — save the owner's own wording
+ *  as both this decision's message and a voice example for future drafts. */
+async function handleVoiceTeach(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const b = body as { client_id?: unknown; message?: unknown };
+  if (typeof b.client_id !== "string" || typeof b.message !== "string" || b.message.trim().length < 10) {
+    return json({ error: "bad_request" }, 400);
+  }
+
+  const decision = await getDecisionForClient(env, firm.id, b.client_id);
+  if (!decision) return json({ error: "no_decision" }, 400);
+
+  await setDraftedMessage(env, firm.id, b.client_id, b.message);
+  await addVoiceSample(env, firm.id, decision.action, b.message);
+  const count = await countVoiceSamples(env, firm.id);
+  return json({ ok: true, count, ready: count > 0 && !!env.ANTHROPIC_API_KEY });
 }
 
 /** POST /api/words/save { client_id, message } — persist the final message. */
