@@ -450,6 +450,48 @@
     .feel-grid, .pill-grid { grid-template-columns: 1fr; }
     .flow-card { padding: 20px; }
   }
+
+  /* ===== THE WORDS ===== */
+  .words-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+  .wf-chip {
+    background: white; border: 1.5px solid var(--gray-light); border-radius: 100px; padding: 8px 15px;
+    font-size: 13px; font-weight: 600; color: var(--gray); cursor: pointer; font-family: 'Inter'; transition: all 0.15s;
+  }
+  .wf-chip:hover { border-color: var(--navy); color: var(--navy); }
+  .wf-chip.active { background: var(--navy); border-color: var(--navy); color: white; }
+  .wf-chip .n { opacity: 0.7; margin-left: 4px; }
+
+  .word-card {
+    background: white; border-radius: 16px; padding: 20px; box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(31, 58, 61, 0.08); margin-bottom: 16px;
+  }
+  .word-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .word-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--navy); }
+  .word-head .spacer { flex: 1; }
+  .word-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 5px 11px; border-radius: 100px; color: white;
+  }
+  .word-badge.keep { background: var(--tier-a); }
+  .word-badge.raise { background: var(--tier-c); }
+  .word-badge.nudge { background: var(--yellow); color: var(--navy); }
+  .word-badge.fire { background: var(--tier-d); }
+  .word-sub { font-size: 12px; color: var(--gray); }
+
+  textarea.word-text {
+    width: 100%; min-height: 150px; resize: vertical; padding: 14px 16px; font-family: 'Inter';
+    font-size: 14px; line-height: 1.6; color: var(--navy); background: var(--cream);
+    border: 1.5px solid var(--gray-light); border-radius: 12px; outline: none; transition: border-color 0.15s;
+    white-space: pre-wrap;
+  }
+  textarea.word-text:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); background: white; }
+  textarea.word-text.empty { color: var(--gray); }
+
+  .word-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .word-actions .btn { padding: 10px 18px; }
+  .word-status { font-size: 13px; font-weight: 600; margin-left: auto; }
+  .word-status.saved { color: var(--tier-a); }
+  .word-status.unsaved { color: var(--tier-c); }
 </style>
 </head>
 <body>
@@ -631,11 +673,17 @@
           </div>
           <p class="section-help">A drafted message for every decision, in a warm, plain voice. Edit before you send.</p>
         </div>
-        <div class="placeholder">
+
+        <div id="wordsEmpty" class="placeholder" style="display:none;">
           <div class="icon">✍️</div>
-          <h3>Message drafting is coming</h3>
-          <p>For each decision, an editable draft for keep, raise, nudge, and let go. You confirm and send every one. Nothing goes out on its own.</p>
-          <span class="step-chip">Build Step 4</span>
+          <h3>Make your decisions first</h3>
+          <p>Once you have decided what to do with a client, a draft message shows up here for you to edit and send. Nothing goes out on its own.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('decide', document.querySelectorAll('.tabnav button')[1])">Go to decisions</button>
+        </div>
+
+        <div id="wordsMain" style="display:none;">
+          <div class="words-filter" id="wordsFilter"></div>
+          <div id="wordsList"></div>
         </div>
       </div>
 
@@ -773,6 +821,7 @@
     document.querySelectorAll('.tabnav button').forEach(function (b) { b.classList.remove('active'); });
     if (btn) btn.classList.add('active');
     if (id === 'decide') loadDecide();
+    if (id === 'words') loadWords();
   }
 
   // ---- auth flow ----
@@ -1408,6 +1457,125 @@
     buildBatches();
     renderDecide();
   });
+
+  // ---- the words (Section 03) ----
+  var words = { items: [], filter: 'all' };
+  var WORD_LABEL = { keep: 'Keep', raise: 'Raise', nudge: 'Nudge', fire: 'Let go' };
+
+  async function loadWords() {
+    try {
+      var results = await Promise.all([fetch('/api/clients'), fetch('/api/decisions')]);
+      if (!results[0].ok) return;
+      var clients = (await results[0].json()).clients || [];
+      var byId = {}; clients.forEach(function (c) { byId[c.id] = c; });
+      var decisions = results[1].ok ? ((await results[1].json()).decisions || []) : [];
+      words.items = decisions.map(function (d) { return { client: byId[d.client_id], decision: d }; })
+        .filter(function (x) { return x.client; });
+      renderWords();
+    } catch (e) { /* leave as-is */ }
+  }
+
+  function renderWords() {
+    var empty = document.getElementById('wordsEmpty');
+    var main = document.getElementById('wordsMain');
+    if (words.items.length === 0) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+    empty.style.display = 'none'; main.style.display = 'block';
+    renderWordsFilter();
+    var list = document.getElementById('wordsList');
+    list.innerHTML = '';
+    var items = words.filter === 'all' ? words.items : words.items.filter(function (x) { return x.decision.action === words.filter; });
+    items.forEach(function (x) { list.appendChild(wordCard(x)); });
+  }
+
+  function renderWordsFilter() {
+    var counts = { all: words.items.length, keep: 0, raise: 0, nudge: 0, fire: 0 };
+    words.items.forEach(function (x) { counts[x.decision.action]++; });
+    var order = [['all', 'All'], ['keep', 'Keep'], ['raise', 'Raise'], ['nudge', 'Nudge'], ['fire', 'Let go']];
+    var el = document.getElementById('wordsFilter');
+    el.innerHTML = '';
+    order.forEach(function (o) {
+      if (o[0] !== 'all' && !counts[o[0]]) return;
+      var b = document.createElement('button');
+      b.className = 'wf-chip' + (words.filter === o[0] ? ' active' : '');
+      b.innerHTML = o[1] + '<span class="n">' + counts[o[0]] + '</span>';
+      b.addEventListener('click', function () { words.filter = o[0]; renderWords(); });
+      el.appendChild(b);
+    });
+  }
+
+  function wordCard(x) {
+    var c = x.client, d = x.decision;
+    var card = document.createElement('div');
+    card.className = 'word-card';
+    var sub = (d.action === 'raise' && d.new_fee != null) ? ('New fee ' + money(d.new_fee)) : (c.entity_type || '');
+    card.innerHTML =
+      '<div class="word-head">' +
+        '<span class="word-name"></span>' +
+        tierBadge(c.tier) +
+        '<span class="word-badge ' + d.action + '">' + WORD_LABEL[d.action] + '</span>' +
+        '<span class="spacer"></span>' +
+        '<span class="word-sub"></span>' +
+      '</div>' +
+      '<textarea class="word-text" placeholder="No draft yet. Tap Draft message to write one."></textarea>' +
+      '<div class="word-actions">' +
+        '<button class="btn btn-secondary act-draft"></button>' +
+        '<button class="btn btn-ghost act-copy">Copy</button>' +
+        '<button class="btn btn-primary act-save" disabled>Save</button>' +
+        '<span class="word-status"></span>' +
+      '</div>';
+    card.querySelector('.word-name').textContent = c.name;
+    card.querySelector('.word-sub').textContent = sub;
+    var ta = card.querySelector('.word-text');
+    var saveBtn = card.querySelector('.act-save');
+    var draftBtn = card.querySelector('.act-draft');
+    var status = card.querySelector('.word-status');
+    ta.value = d.drafted_message || '';
+    draftBtn.textContent = d.drafted_message ? 'Regenerate' : 'Draft message';
+    if (d.drafted_message) { status.className = 'word-status saved'; status.textContent = 'Saved'; }
+
+    function markUnsaved() {
+      var empty = ta.value.trim() === '';
+      saveBtn.disabled = empty;
+      status.className = 'word-status unsaved';
+      status.textContent = empty ? '' : 'Unsaved changes';
+    }
+    ta.addEventListener('input', markUnsaved);
+
+    draftBtn.addEventListener('click', async function () {
+      var prev = draftBtn.textContent;
+      draftBtn.disabled = true; draftBtn.textContent = 'Drafting…';
+      try {
+        var res = await fetch('/api/words/generate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.message) { ta.value = data.message; markUnsaved(); draftBtn.textContent = 'Regenerate'; }
+        else draftBtn.textContent = prev;
+      } catch (e) { draftBtn.textContent = prev; }
+      draftBtn.disabled = false;
+    });
+
+    card.querySelector('.act-copy').addEventListener('click', function () {
+      if (!ta.value) return;
+      if (navigator.clipboard) navigator.clipboard.writeText(ta.value);
+      var self = this, orig = self.textContent;
+      self.textContent = 'Copied'; setTimeout(function () { self.textContent = orig; }, 1500);
+    });
+
+    saveBtn.addEventListener('click', async function () {
+      var prev = saveBtn.textContent;
+      saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+      try {
+        var res = await fetch('/api/words/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id, message: ta.value })
+        });
+        if (res.ok) { d.drafted_message = ta.value; status.className = 'word-status saved'; status.textContent = 'Saved'; saveBtn.textContent = 'Save'; }
+        else { saveBtn.textContent = prev; saveBtn.disabled = false; }
+      } catch (e) { saveBtn.textContent = prev; saveBtn.disabled = false; }
+    });
+
+    return card;
+  }
 
   checkSession();
 </script>

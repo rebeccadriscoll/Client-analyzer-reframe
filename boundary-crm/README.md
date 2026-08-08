@@ -10,8 +10,26 @@ Built so far:
   or correct, realized-rate calc, and A-D tiering, written to the `client` table.
 - **Step 3 — Guided modules.** Clients grouped into small batches by realized rate; a
   three-step flow per client (meet → gut-check → confirm) writing one `decision` each.
+- **Step 4 — The Words.** An editable draft message per decision (keep/raise/nudge/fire)
+  in a warm, plain voice, saved onto the decision.
 
-The Words, rollout, tracker, and the Fear Killer arrive in later steps.
+Rollout, tracker, and the Fear Killer arrive in later steps.
+
+## The Words (Step 4)
+
+Every decision gets a draft you can edit, copy, and save. Drafts are personalized with
+the client name and, for raises, the old and new fee.
+
+- **Voice is enforced.** Generated copy never contains an em or en dash, nor the words
+  honestly, quietly, genuinely, or straightforward. Deterministic templates (one per
+  action) are the default, so drafts always comply; when a Workers AI binding is present,
+  an optional call may replace the draft and the result is still run through the same
+  `sanitizeVoice` net. The prompt stays server-side.
+- **Nothing auto-sends.** The tool drafts; you edit and send. The message is saved on the
+  decision only when you click Save.
+
+Backed by `POST /api/words/generate` (`{ client_id }` → draft) and `POST /api/words/save`
+(`{ client_id, message }`), both firm-scoped and requiring an existing decision.
 
 ## Guided decisions (Step 3)
 
@@ -67,6 +85,8 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/import/commit` | POST | Write clients (`{ csv, mapping, replace? }`) |
 | `/api/decisions` | GET | List the firm's decisions |
 | `/api/decisions` | POST | Save one decision (`{ client_id, action, new_fee? }`) |
+| `/api/words/generate` | POST | Draft a message for a decision (`{ client_id }`) |
+| `/api/words/save` | POST | Save the final message (`{ client_id, message }`) |
 
 Every route except the auth request/verify requires a valid session, and every query is
 scoped to the firm behind that session.
@@ -148,6 +168,7 @@ boundary-crm/
     crypto.ts           token generation, hashing, cookie parsing
     email.ts            Resend adapter with a dev fallback
     scoring.ts          realized rate, A-D tiering, numeric parsing
+    words.ts            message templates + voice guardrail + optional LLM
     import/
       csv.ts            CSV parser (quotes, commas, CRLF)
       importer.ts       Importer adapter interface + SpreadsheetImporter

@@ -13,9 +13,13 @@ import {
   clientBelongsToFirm,
   getDecisions,
   upsertDecision,
+  getDecisionForClient,
+  setDraftedMessage,
+  getClient,
   type NewClient,
 } from "./db";
 import type { Action } from "./types";
+import { generateWords } from "./words";
 import { sendMagicLink } from "./email";
 import { SpreadsheetImporter } from "./import/importer";
 import { suggestMapping, refineWithLLM, CLIENT_FIELDS } from "./import/mapping";
@@ -59,6 +63,12 @@ export default {
       }
       if (pathname === "/api/decisions" && request.method === "POST") {
         return await handleSaveDecision(request, env);
+      }
+      if (pathname === "/api/words/generate" && request.method === "POST") {
+        return await handleWordsGenerate(request, env);
+      }
+      if (pathname === "/api/words/save" && request.method === "POST") {
+        return await handleWordsSave(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -289,6 +299,52 @@ async function handleSaveDecision(request: Request, env: Env): Promise<Response>
 
   const decision = await upsertDecision(env, firm.id, { client_id: b.client_id, action, new_fee });
   return json({ decision });
+}
+
+/** POST /api/words/generate { client_id } — draft a message for the decision. */
+async function handleWordsGenerate(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const clientId = (body as { client_id?: unknown }).client_id;
+  if (typeof clientId !== "string") return json({ error: "bad_request" }, 400);
+
+  const client = await getClient(env, firm.id, clientId);
+  if (!client) return json({ error: "not_found" }, 404);
+  const decision = await getDecisionForClient(env, firm.id, clientId);
+  if (!decision) return json({ error: "no_decision" }, 400);
+
+  const message = await generateWords(env, client, decision);
+  return json({ message });
+}
+
+/** POST /api/words/save { client_id, message } — persist the final message. */
+async function handleWordsSave(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const b = body as { client_id?: unknown; message?: unknown };
+  if (typeof b.client_id !== "string" || typeof b.message !== "string") {
+    return json({ error: "bad_request" }, 400);
+  }
+
+  const decision = await getDecisionForClient(env, firm.id, b.client_id);
+  if (!decision) return json({ error: "no_decision" }, 400);
+
+  const saved = await setDraftedMessage(env, firm.id, b.client_id, b.message);
+  return json({ decision: saved });
 }
 
 /** Read a CSV body from either raw text or a JSON { csv } envelope. */

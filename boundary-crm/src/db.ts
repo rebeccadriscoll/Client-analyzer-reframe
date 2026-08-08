@@ -163,6 +163,14 @@ export async function deleteClientsForFirm(env: Env, firmId: string): Promise<vo
   await env.DB.prepare("DELETE FROM client WHERE firm_id = ?").bind(firmId).run();
 }
 
+/** One client, scoped to the firm, or null. */
+export async function getClient(env: Env, firmId: string, clientId: string): Promise<Client | null> {
+  const row = await env.DB.prepare("SELECT * FROM client WHERE id = ? AND firm_id = ?")
+    .bind(clientId, firmId)
+    .first<Client>();
+  return row ?? null;
+}
+
 /** True if the client exists and belongs to this firm. */
 export async function clientBelongsToFirm(env: Env, firmId: string, clientId: string): Promise<boolean> {
   const row = await env.DB.prepare("SELECT 1 AS ok FROM client WHERE id = ? AND firm_id = ?")
@@ -204,4 +212,25 @@ export async function upsertDecision(
     .bind(input.client_id)
     .first<Decision>();
   return row!;
+}
+
+/** The decision for one client, scoped to the firm. */
+export async function getDecisionForClient(env: Env, firmId: string, clientId: string): Promise<Decision | null> {
+  const row = await env.DB.prepare("SELECT * FROM decision WHERE client_id = ? AND firm_id = ?")
+    .bind(clientId, firmId)
+    .first<Decision>();
+  return row ?? null;
+}
+
+/** Save the drafted message (The Words) onto an existing decision. */
+export async function setDraftedMessage(
+  env: Env,
+  firmId: string,
+  clientId: string,
+  message: string
+): Promise<Decision | null> {
+  await env.DB.prepare("UPDATE decision SET drafted_message = ? WHERE client_id = ? AND firm_id = ?")
+    .bind(message, clientId, firmId)
+    .run();
+  return getDecisionForClient(env, firmId, clientId);
 }
