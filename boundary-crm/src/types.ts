@@ -11,10 +11,11 @@ export interface Env {
   ASSETS: Fetcher;
   /** Workers AI binding, used for optional LLM column-mapping refinement. */
   AI?: AiBinding;
-  /** Resend API key. When unset, the app runs in dev mode and surfaces the
+  /** Brevo API key. When unset, the app runs in dev mode and surfaces the
    *  sign-in link in the response instead of emailing it. Set in production. */
-  RESEND_API_KEY?: string;
-  /** From header for the sign-in email, e.g. "Boundary CRM <login@yourfirm.com>". */
+  BREVO_API_KEY?: string;
+  /** Sender for the sign-in email, e.g. "Boundary CRM <login@yourfirm.com>".
+   *  The address must be a verified sender/domain in Brevo. */
   MAIL_FROM?: string;
   /** Public base URL used to build sign-in links. Falls back to the request origin. */
   APP_URL?: string;

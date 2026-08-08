@@ -8,41 +8,49 @@ export interface MagicEmailResult {
 }
 
 /**
- * Send the sign-in link. With RESEND_API_KEY set, it emails via Resend.
+ * Send the sign-in link. With BREVO_API_KEY set, it emails via Brevo.
  * Without it, the app is in dev mode: the link is logged and returned so a
  * developer can sign in without wiring up mail. Do not deploy to production
  * without configuring a provider — see the README.
  */
 export async function sendMagicLink(env: Env, email: string, link: string): Promise<MagicEmailResult> {
-  if (!env.RESEND_API_KEY) {
-    console.warn(`[boundary-crm] DEV MODE: no RESEND_API_KEY. Magic link for ${email}: ${link}`);
+  if (!env.BREVO_API_KEY) {
+    console.warn(`[boundary-crm] DEV MODE: no BREVO_API_KEY. Magic link for ${email}: ${link}`);
     return { sent: false, devLink: link };
   }
 
-  const from = env.MAIL_FROM || "Boundary CRM <login@example.com>";
-  const res = await fetch("https://api.resend.com/emails", {
+  const sender = parseSender(env.MAIL_FROM || "Boundary CRM <login@example.com>");
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      "api-key": env.BREVO_API_KEY,
       "Content-Type": "application/json",
+      accept: "application/json",
     },
     body: JSON.stringify({
-      from,
-      to: [email],
+      sender,
+      to: [{ email }],
       subject: "Your Boundary CRM sign-in link",
-      text:
+      textContent:
         `Sign in to Boundary CRM:\n\n${link}\n\n` +
         `This link expires in 15 minutes and can be used once. ` +
         `If you did not request it, you can ignore this email.`,
-      html: magicEmailHtml(link),
+      htmlContent: magicEmailHtml(link),
     }),
   });
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`Resend send failed (${res.status}): ${detail}`);
+    throw new Error(`Brevo send failed (${res.status}): ${detail}`);
   }
   return { sent: true };
+}
+
+/** Parse a "Name <email>" string into Brevo's sender shape. */
+function parseSender(from: string): { name: string; email: string } {
+  const m = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1] || "Boundary CRM", email: m[2].trim() };
+  return { name: "Boundary CRM", email: from.trim() };
 }
 
 function magicEmailHtml(link: string): string {
