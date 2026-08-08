@@ -8,8 +8,29 @@ Built so far:
   numbered sections (Import, Decide, The Words, Rollout, Tracker, Fear Killer).
 - **Step 2 — Import.** CSV upload with confidence-scored column mapping you can confirm
   or correct, realized-rate calc, and A-D tiering, written to the `client` table.
+- **Step 3 — Guided modules.** Clients grouped into small batches by realized rate; a
+  three-step flow per client (meet → gut-check → confirm) writing one `decision` each.
 
-Decisions, The Words, rollout, tracker, and the Fear Killer arrive in later steps.
+The Words, rollout, tracker, and the Fear Killer arrive in later steps.
+
+## Guided decisions (Step 3)
+
+Clients sort by realized rate (lowest first, where the raise/let-go calls usually are)
+and split into fixed-size batches (3 / 5 / 8, your choice). You work a batch one client
+at a time:
+
+1. **Meet** — the numbers (fee, hours, realized rate, tier), plain-language flags, and a
+   short read of where the client stands.
+2. **Gut check** — one honest question (how their name landing on your phone feels). It
+   only shapes the suggestion; it is never persisted or acted on by itself.
+3. **The call** — a suggested action with its reason shown, then you tap Keep, Raise,
+   Nudge, or Let go. Raise prefills a fee that lifts the client to your book-average rate,
+   editable, with a live delta. Saving writes the `decision` and advances to the next
+   client.
+
+Decisions upsert (one per client), so re-deciding updates in place. Nothing is sent or
+acted on: this only records the call. `GET /api/decisions` and `POST /api/decisions`
+(`{ client_id, action, new_fee? }`) back the flow, both scoped to the firm.
 
 Cloudflare-native by design: a single Worker serves the static shell (`public/`) and
 handles the API and auth routes, with **D1** for data. This matches the Client Analyzer's
@@ -44,6 +65,8 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/clients` | GET | List the firm's clients + tier breakdown |
 | `/api/import/preview` | POST | Parse a CSV, return headers + mapping suggestions |
 | `/api/import/commit` | POST | Write clients (`{ csv, mapping, replace? }`) |
+| `/api/decisions` | GET | List the firm's decisions |
+| `/api/decisions` | POST | Save one decision (`{ client_id, action, new_fee? }`) |
 
 Every route except the auth request/verify requires a valid session, and every query is
 scoped to the firm behind that session.
@@ -118,10 +141,10 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth: firm/token/session; 0002 client)
+  migrations/           D1 schema (0001 auth; 0002 client; 0003 decision)
   src/
-    index.ts            Worker router: auth + /api/clients + /api/import/*
-    db.ts               D1 queries (firm, tokens, sessions, clients)
+    index.ts            Worker router: auth + clients + import + decisions
+    db.ts               D1 queries (firm, tokens, sessions, clients, decisions)
     crypto.ts           token generation, hashing, cookie parsing
     email.ts            Resend adapter with a dev fallback
     scoring.ts          realized rate, A-D tiering, numeric parsing

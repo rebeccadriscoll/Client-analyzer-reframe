@@ -10,8 +10,12 @@ import {
   insertClients,
   listClients,
   deleteClientsForFirm,
+  clientBelongsToFirm,
+  getDecisions,
+  upsertDecision,
   type NewClient,
 } from "./db";
+import type { Action } from "./types";
 import { sendMagicLink } from "./email";
 import { SpreadsheetImporter } from "./import/importer";
 import { suggestMapping, refineWithLLM, CLIENT_FIELDS } from "./import/mapping";
@@ -49,6 +53,12 @@ export default {
       }
       if (pathname === "/api/import/commit" && request.method === "POST") {
         return await handleImportCommit(request, env);
+      }
+      if (pathname === "/api/decisions" && request.method === "GET") {
+        return await handleListDecisions(request, env);
+      }
+      if (pathname === "/api/decisions" && request.method === "POST") {
+        return await handleSaveDecision(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -236,6 +246,49 @@ async function handleImportCommit(request: Request, env: Env): Promise<Response>
     clients: all,
     count: all.length,
   });
+}
+
+const ACTIONS: Action[] = ["keep", "raise", "fire", "nudge"];
+
+/** GET /api/decisions — every decision for the firm. */
+async function handleListDecisions(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const decisions = await getDecisions(env, firm.id);
+  return json({ decisions, count: decisions.length });
+}
+
+/** POST /api/decisions { client_id, action, new_fee? } — save one decision. */
+async function handleSaveDecision(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const b = body as { client_id?: unknown; action?: unknown; new_fee?: unknown };
+
+  if (typeof b.client_id !== "string") return json({ error: "bad_request" }, 400);
+  if (typeof b.action !== "string" || !ACTIONS.includes(b.action as Action)) {
+    return json({ error: "invalid_action" }, 400);
+  }
+  const action = b.action as Action;
+
+  let new_fee: number | null = null;
+  if (action === "raise") {
+    const fee = typeof b.new_fee === "number" ? b.new_fee : Number(b.new_fee);
+    new_fee = Number.isFinite(fee) && fee > 0 ? fee : null;
+  }
+
+  if (!(await clientBelongsToFirm(env, firm.id, b.client_id))) {
+    return json({ error: "not_found" }, 404);
+  }
+
+  const decision = await upsertDecision(env, firm.id, { client_id: b.client_id, action, new_fee });
+  return json({ decision });
 }
 
 /** Read a CSV body from either raw text or a JSON { csv } envelope. */

@@ -1,4 +1,4 @@
-import type { Env, Firm, Client, Tier } from "./types";
+import type { Env, Firm, Client, Tier, Action, Decision } from "./types";
 import { randomToken, sha256Hex } from "./crypto";
 
 const MAGIC_TTL_MS = 15 * 60 * 1000; // 15 minutes
@@ -158,5 +158,50 @@ export async function listClients(env: Env, firmId: string): Promise<Client[]> {
 
 /** Remove every client for a firm (used by "replace" re-import). */
 export async function deleteClientsForFirm(env: Env, firmId: string): Promise<void> {
+  // Decisions reference clients, so clear them first to keep the data consistent.
+  await env.DB.prepare("DELETE FROM decision WHERE firm_id = ?").bind(firmId).run();
   await env.DB.prepare("DELETE FROM client WHERE firm_id = ?").bind(firmId).run();
+}
+
+/** True if the client exists and belongs to this firm. */
+export async function clientBelongsToFirm(env: Env, firmId: string, clientId: string): Promise<boolean> {
+  const row = await env.DB.prepare("SELECT 1 AS ok FROM client WHERE id = ? AND firm_id = ?")
+    .bind(clientId, firmId)
+    .first<{ ok: number }>();
+  return row != null;
+}
+
+// ---- decisions ----
+
+/** All decisions for a firm. */
+export async function getDecisions(env: Env, firmId: string): Promise<Decision[]> {
+  const res = await env.DB.prepare("SELECT * FROM decision WHERE firm_id = ?").bind(firmId).all<Decision>();
+  return res.results ?? [];
+}
+
+/**
+ * Create or update the decision for a client. On update, action/new_fee/timestamp
+ * change but drafted_message is preserved (it is owned by Step 4).
+ */
+export async function upsertDecision(
+  env: Env,
+  firmId: string,
+  input: { client_id: string; action: Action; new_fee: number | null }
+): Promise<Decision> {
+  const now = Date.now();
+  await env.DB.prepare(
+    `INSERT INTO decision (id, client_id, firm_id, action, new_fee, drafted_message, decided_at)
+     VALUES (?, ?, ?, ?, ?, NULL, ?)
+     ON CONFLICT(client_id) DO UPDATE SET
+       action = excluded.action,
+       new_fee = excluded.new_fee,
+       decided_at = excluded.decided_at`
+  )
+    .bind(crypto.randomUUID(), input.client_id, firmId, input.action, input.new_fee, now)
+    .run();
+
+  const row = await env.DB.prepare("SELECT * FROM decision WHERE client_id = ?")
+    .bind(input.client_id)
+    .first<Decision>();
+  return row!;
 }

@@ -22,6 +22,18 @@ export interface Env {
 
 export type Tier = "A" | "B" | "C" | "D";
 
+export type Action = "keep" | "raise" | "fire" | "nudge";
+
+export interface Decision {
+  id: string;
+  client_id: string;
+  firm_id: string;
+  action: Action;
+  new_fee: number | null;
+  drafted_message: string | null;
+  decided_at: number;
+}
+
 export interface Client {
   id: string;
   firm_id: string;
