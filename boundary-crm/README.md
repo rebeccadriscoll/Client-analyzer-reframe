@@ -134,7 +134,7 @@ scoped to the firm behind that session.
 - **Cloudflare Workers** (`src/index.ts`) — API + magic-link verify, TypeScript.
 - **Workers Static Assets** — serves `public/index.html` (the shell).
 - **Cloudflare D1** — Postgres-style SQLite. Schema in `migrations/`.
-- **Resend** (optional) — sends the sign-in email. Without it, the app runs in dev mode.
+- **Brevo** (optional) — sends the sign-in email. Without it, the app runs in dev mode.
 
 No frontend build step: the shell is a single static HTML file, matching the analyzer's
 approach and the "smallest number of moving parts" goal in the handoff.
@@ -168,13 +168,13 @@ Click it to sign in.
    npm run db:migrate:remote
    ```
 3. **Configure email** (required in production, or sign-in links are exposed in the
-   API response). Create a [Resend](https://resend.com) API key for a verified sending
-   domain, then:
+   API response). Create a [Brevo](https://www.brevo.com) API key and verify a sender
+   or domain there, then:
    ```bash
-   npx wrangler secret put RESEND_API_KEY
+   npx wrangler secret put BREVO_API_KEY
    ```
-   Set `MAIL_FROM` in `wrangler.jsonc` `vars` to a sender on that domain, and set
-   `APP_URL` to your deployed URL so links point at production.
+   Set `MAIL_FROM` in `wrangler.jsonc` `vars` to a verified sender on that domain, and
+   set `APP_URL` to your deployed URL so links point at production.
 4. Deploy:
    ```bash
    npm run deploy
@@ -204,7 +204,7 @@ boundary-crm/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)
     crypto.ts           token generation, hashing, cookie parsing
-    email.ts            Resend adapter with a dev fallback
+    email.ts            Brevo adapter with a dev fallback
     scoring.ts          realized rate, A-D tiering, numeric parsing
     words.ts            message templates + voice guardrail + optional LLM
     rollout.ts          wave order/labels + proposed-fee logic

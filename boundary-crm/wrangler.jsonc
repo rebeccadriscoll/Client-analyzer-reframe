@@ -28,8 +28,9 @@
     "binding": "AI"
   },
   "vars": {
-    // Owner-facing sender for the sign-in email. Override per environment.
-    // RESEND_API_KEY is a secret, set it with `wrangler secret put RESEND_API_KEY`.
-    "MAIL_FROM": "Boundary CRM <login@example.com>"
+    // Sender for the sign-in email. Must be a verified sender/domain in Brevo.
+    // BREVO_API_KEY is a secret: set it with `wrangler secret put BREVO_API_KEY`
+    // (or in the dashboard under Settings -> Variables and Secrets).
+    "MAIL_FROM": "Boundary CRM <login@rdriscollcpa.com>"
   }
 }
