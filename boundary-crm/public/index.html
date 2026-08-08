@@ -492,6 +492,84 @@
   .word-status { font-size: 13px; font-weight: 600; margin-left: auto; }
   .word-status.saved { color: var(--tier-a); }
   .word-status.unsaved { color: var(--tier-c); }
+
+  /* ===== ROLLOUT (waves) ===== */
+  .wave-card {
+    background: white; border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(31, 58, 61, 0.08); border-left: 4px solid var(--gray-light); margin-bottom: 16px;
+  }
+  .wave-card.raise { border-left-color: var(--tier-c); }
+  .wave-card.keep { border-left-color: var(--tier-a); }
+  .wave-card.nudge { border-left-color: var(--yellow); }
+  .wave-card.fire { border-left-color: var(--tier-d); }
+  .wave-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .wave-order { font-family: 'Fraunces', serif; font-style: italic; font-size: 12px; color: var(--coral-deep); }
+  .wave-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; color: var(--navy); }
+  .wave-blurb { font-size: 13px; color: var(--gray); margin-bottom: 14px; max-width: 460px; }
+  .wave-figures { text-align: right; }
+  .wave-figures .rev { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; color: var(--navy); }
+  .wave-figures .cnt { font-size: 12px; color: var(--gray); }
+  .wave-members { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .wave-chip {
+    display: inline-flex; align-items: center; gap: 6px; background: var(--cream); border: 1px solid rgba(31,58,61,0.08);
+    border-radius: 100px; padding: 5px 12px 5px 6px; font-size: 13px; color: var(--navy);
+  }
+  .wave-chip .fee { color: var(--gray); font-size: 12px; }
+  .wave-empty { font-size: 13px; color: var(--gray); font-style: italic; margin-bottom: 8px; }
+  .wave-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid rgba(31,58,61,0.07); padding-top: 14px; }
+  .wave-controls label { font-size: 12px; font-weight: 600; color: var(--gray); }
+  .wave-controls input[type="date"], .wave-controls select {
+    padding: 8px 12px; font-size: 13px; font-family: 'Inter'; color: var(--navy);
+    border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none;
+  }
+  .wave-controls input:focus, .wave-controls select:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .wave-status-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 100px; }
+  .wave-status-tag.draft { background: var(--cream-deep); color: var(--gray); }
+  .wave-status-tag.scheduled { background: rgba(245,208,97,0.25); color: #8A6D10; }
+  .wave-status-tag.sent { background: rgba(45,106,107,0.14); color: var(--tier-a); }
+
+  /* ===== TRACKER ===== */
+  .tracker-summary {
+    background: var(--navy); color: white; border-radius: 20px; padding: 26px 28px; margin-bottom: 22px;
+    position: relative; overflow: hidden;
+  }
+  .tracker-summary::before { content:''; position:absolute; top:-50px; right:-50px; width:180px; height:180px; background:var(--yellow); opacity:0.15; border-radius:50%; }
+  .ts-label { font-size: 13px; opacity: 0.85; position: relative; z-index: 1; }
+  .ts-total { font-family: 'Fraunces', serif; font-size: 42px; font-weight: 700; line-height: 1.1; position: relative; z-index: 1; }
+  .ts-sub { font-size: 13px; opacity: 0.85; margin-top: 4px; position: relative; z-index: 1; }
+  .ts-bar { height: 8px; background: rgba(255,255,255,0.18); border-radius: 100px; overflow: hidden; margin-top: 16px; position: relative; z-index: 1; }
+  .ts-bar span { display: block; height: 100%; background: var(--yellow); border-radius: 100px; transition: width 0.3s; }
+
+  .track-row {
+    background: white; border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(31,58,61,0.08); margin-bottom: 12px;
+    display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center;
+  }
+  .track-who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .track-name { font-weight: 600; color: var(--navy); font-size: 15px; }
+  .track-fee { font-size: 13px; color: var(--gray); }
+  .track-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .state-pills { display: inline-flex; background: var(--cream); border-radius: 100px; padding: 3px; }
+  .state-pill {
+    border: none; background: transparent; font-family: 'Inter'; font-size: 12px; font-weight: 600; color: var(--gray);
+    padding: 6px 11px; border-radius: 100px; cursor: pointer; transition: all 0.15s;
+  }
+  .state-pill:hover { color: var(--navy); }
+  .state-pill.on.told { background: var(--gray-light); color: var(--navy); }
+  .state-pill.on.silent { background: var(--tier-c); color: white; }
+  .state-pill.on.agreed { background: var(--tier-a); color: white; }
+  .state-pill.on.declined { background: var(--tier-d); color: white; }
+  .copy-link {
+    background: none; border: 1px solid var(--gray-light); color: var(--gray); font-family: 'Inter';
+    font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 100px; cursor: pointer; white-space: nowrap;
+  }
+  .copy-link:hover { border-color: var(--coral); color: var(--coral-deep); }
+
+  @media (max-width: 640px) {
+    .track-row { grid-template-columns: 1fr; }
+    .track-right { justify-content: flex-start; }
+    .wave-figures { text-align: left; }
+  }
 </style>
 </head>
 <body>
@@ -696,11 +774,14 @@
           </div>
           <p class="section-help">Raises and keeps first, then nudges, then goodbyes.</p>
         </div>
-        <div class="placeholder">
+        <div id="rolloutEmpty" class="placeholder" style="display:none;">
           <div class="icon">🌊</div>
-          <h3>Rollout waves are coming</h3>
-          <p>Your decisions organized into send waves, in the order that keeps your revenue steady while you make the changes.</p>
-          <span class="step-chip">Build Step 5</span>
+          <h3>Make your decisions first</h3>
+          <p>Once clients are decided, they organize into send waves here, in the order that keeps your revenue steady.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('decide', document.querySelectorAll('.tabnav button')[1])">Go to decisions</button>
+        </div>
+        <div id="rolloutMain" style="display:none;">
+          <div id="wavesList"></div>
         </div>
       </div>
 
@@ -713,11 +794,15 @@
           </div>
           <p class="section-help">Watch responses land. See committed revenue add up.</p>
         </div>
-        <div class="placeholder">
+        <div id="trackerEmpty" class="placeholder" style="display:none;">
           <div class="icon">📈</div>
-          <h3>The tracker is coming</h3>
-          <p>Each client moves through told, silent, agreed, or declined. A live total sums the fees of everyone who has agreed.</p>
-          <span class="step-chip">Build Step 5</span>
+          <h3>Make your decisions first</h3>
+          <p>As you send messages and clients respond, mark each one here. The committed total updates as agreements land.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('decide', document.querySelectorAll('.tabnav button')[1])">Go to decisions</button>
+        </div>
+        <div id="trackerMain" style="display:none;">
+          <div class="tracker-summary" id="trackerSummary"></div>
+          <div id="trackerList"></div>
         </div>
       </div>
 
@@ -822,6 +907,7 @@
     if (btn) btn.classList.add('active');
     if (id === 'decide') loadDecide();
     if (id === 'words') loadWords();
+    if (id === 'rollout' || id === 'tracker') loadRollout();
   }
 
   // ---- auth flow ----
@@ -1575,6 +1661,174 @@
     });
 
     return card;
+  }
+
+  // ---- rollout + tracker (Sections 04 and 05) ----
+  var roll = { waves: [], tracker: [], potential: 0 };
+  var STATE_ORDER = ['told', 'silent', 'agreed', 'declined'];
+  var STATE_LABEL = { told: 'Told', silent: 'Silent', agreed: 'Agreed', declined: 'Declined' };
+
+  async function loadRollout() {
+    try {
+      var res = await fetch('/api/rollout');
+      if (!res.ok) return;
+      var d = await res.json();
+      roll.waves = d.waves || [];
+      roll.tracker = d.tracker || [];
+      roll.potential = d.potential || 0;
+      renderRollout();
+      renderTracker();
+    } catch (e) { /* leave as-is */ }
+  }
+
+  function hasDecisions() { return roll.tracker.length > 0; }
+
+  function renderRollout() {
+    var empty = document.getElementById('rolloutEmpty');
+    var main = document.getElementById('rolloutMain');
+    if (!hasDecisions()) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+    empty.style.display = 'none'; main.style.display = 'block';
+    var list = document.getElementById('wavesList');
+    list.innerHTML = '';
+    var shown = roll.waves.filter(function (w) { return w.count > 0; });
+    shown.forEach(function (w, i) { list.appendChild(waveCard(w, i)); });
+  }
+
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function waveCard(w, i) {
+    var card = document.createElement('div');
+    card.className = 'wave-card ' + w.type;
+    var members = w.members.length
+      ? '<div class="wave-members">' + w.members.map(function (m) {
+          return '<span class="wave-chip">' + tierBadge(m.tier) + esc(m.name) + ' <span class="fee">' + (m.fee ? money(m.fee) : '—') + '</span></span>';
+        }).join('') + '</div>'
+      : '<div class="wave-empty">No clients in this wave yet.</div>';
+    card.innerHTML =
+      '<div class="wave-top">' +
+        '<div><div class="wave-order">Wave ' + (i + 1) + '</div><div class="wave-title">' + esc(w.label) + '</div></div>' +
+        '<div class="wave-figures"><div class="rev">' + money(w.revenue) + '</div><div class="cnt">' + w.count + ' client' + (w.count === 1 ? '' : 's') + '</div></div>' +
+      '</div>' +
+      '<div class="wave-blurb">' + esc(w.blurb) + '</div>' +
+      members +
+      '<div class="wave-controls">' +
+        '<label>Send date</label>' +
+        '<input type="date" class="wave-date" value="' + (w.send_date || '') + '">' +
+        '<label>Status</label>' +
+        '<select class="wave-statsel">' + ['draft', 'scheduled', 'sent'].map(function (s) {
+          return '<option value="' + s + '"' + (w.status === s ? ' selected' : '') + '>' + cap(s) + '</option>';
+        }).join('') + '</select>' +
+        '<span class="wave-status-tag ' + w.status + '">' + w.status + '</span>' +
+      '</div>';
+    var dateEl = card.querySelector('.wave-date');
+    var selEl = card.querySelector('.wave-statsel');
+    var tag = card.querySelector('.wave-status-tag');
+    function saveWave() {
+      var status = selEl.value, sendDate = dateEl.value || null;
+      tag.className = 'wave-status-tag ' + status; tag.textContent = status;
+      w.status = status; w.send_date = sendDate;
+      fetch('/api/waves', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: w.type, send_date: sendDate, status: status })
+      });
+    }
+    dateEl.addEventListener('change', saveWave);
+    selEl.addEventListener('change', saveWave);
+    return card;
+  }
+
+  function committedTotal() {
+    return roll.tracker.filter(function (t) { return t.state === 'agreed'; })
+      .reduce(function (s, t) { return s + (t.proposed_fee || 0); }, 0);
+  }
+
+  function renderTracker() {
+    var empty = document.getElementById('trackerEmpty');
+    var main = document.getElementById('trackerMain');
+    if (!hasDecisions()) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+    empty.style.display = 'none'; main.style.display = 'block';
+    renderTrackerSummary();
+    var list = document.getElementById('trackerList');
+    list.innerHTML = '';
+    roll.tracker.forEach(function (t) { list.appendChild(trackRow(t)); });
+  }
+
+  function renderTrackerSummary() {
+    var committed = committedTotal();
+    var potential = roll.potential || 0;
+    var pct = potential > 0 ? Math.round(committed / potential * 100) : 0;
+    var agreed = roll.tracker.filter(function (t) { return t.state === 'agreed'; }).length;
+    document.getElementById('trackerSummary').innerHTML =
+      '<div class="ts-label">Committed revenue</div>' +
+      '<div class="ts-total">' + money(committed) + '</div>' +
+      '<div class="ts-sub">' + agreed + ' agreed · ' + money(potential) + ' on the table</div>' +
+      '<div class="ts-bar"><span style="width:' + pct + '%"></span></div>';
+  }
+
+  function paintPills(row, state) {
+    row.querySelectorAll('.state-pill').forEach(function (b) {
+      b.classList.toggle('on', b.getAttribute('data-state') === state);
+    });
+  }
+
+  function trackRow(t) {
+    var row = document.createElement('div');
+    row.className = 'track-row';
+    var feeTxt = t.action === 'fire' ? 'Goodbye' : ('Proposed ' + money(t.proposed_fee));
+    row.innerHTML =
+      '<div class="track-who">' +
+        tierBadge(t.client.tier) +
+        '<span class="track-name">' + esc(t.client.name) + '</span>' +
+        '<span class="word-badge ' + t.action + '">' + WORD_LABEL[t.action] + '</span>' +
+        '<span class="track-fee">' + feeTxt + '</span>' +
+      '</div>' +
+      '<div class="track-right">' +
+        '<div class="state-pills">' + STATE_ORDER.map(function (s) {
+          return '<button class="state-pill ' + s + (t.state === s ? ' on' : '') + '" data-state="' + s + '">' + STATE_LABEL[s] + '</button>';
+        }).join('') + '</div>' +
+        '<button class="copy-link">Copy link</button>' +
+      '</div>';
+    row.querySelectorAll('.state-pill').forEach(function (b) {
+      b.addEventListener('click', function () { setCommitState(t, b.getAttribute('data-state'), row); });
+    });
+    row.querySelector('.copy-link').addEventListener('click', function () { copyLink(t, this, row); });
+    return row;
+  }
+
+  async function setCommitState(t, state, row) {
+    try {
+      var res = await fetch('/api/commitments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: t.client.id, state: state })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) return;
+      t.state = state;
+      t.link_token = data.commitment.link_token;
+      t.committed_fee = data.commitment.committed_fee;
+      paintPills(row, state);
+      renderTrackerSummary();
+    } catch (e) { /* ignore */ }
+  }
+
+  async function copyLink(t, btn, row) {
+    if (!t.link_token) {
+      try {
+        var res = await fetch('/api/commitments', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: t.client.id, state: t.state || 'told' })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok) {
+          t.link_token = data.commitment.link_token;
+          if (!t.state) { t.state = data.commitment.state; paintPills(row, t.state); renderTrackerSummary(); }
+        }
+      } catch (e) { /* ignore */ }
+    }
+    if (!t.link_token) return;
+    var link = location.origin + '/c/' + t.link_token;
+    if (navigator.clipboard) navigator.clipboard.writeText(link);
+    var orig = btn.textContent;
+    btn.textContent = 'Copied link';
+    setTimeout(function () { btn.textContent = orig; }, 1500);
   }
 
   checkSession();

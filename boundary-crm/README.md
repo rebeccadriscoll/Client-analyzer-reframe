@@ -12,8 +12,28 @@ Built so far:
   three-step flow per client (meet → gut-check → confirm) writing one `decision` each.
 - **Step 4 — The Words.** An editable draft message per decision (keep/raise/nudge/fire)
   in a warm, plain voice, saved onto the decision.
+- **Step 5 — Rollout + Tracker.** Decisions organized into send waves; commitment links
+  with told/silent/agreed/declined states and a live committed-revenue total.
 
-Rollout, tracker, and the Fear Killer arrive in later steps.
+The Fear Killer arrives in the last step.
+
+## Rollout and tracker (Step 5)
+
+**Rollout** groups decisions into four waves in send order that keeps revenue steady:
+Raises first, then Keepers, Nudges, and Goodbyes last. Each wave shows its clients and the
+revenue at stake, and carries a send date and a status (draft / scheduled / sent) you set.
+
+**Tracker** is where responses land. Each decided client has a commitment with a state
+(told → silent → agreed / declined) and a shareable **commitment link**. A live committed
+total sums the fees of everyone who has agreed, against the full amount on the table.
+
+- **Commitment links are real.** `GET /c/:token` serves a public, token-authenticated
+  confirm page (no login) tailored to the action, where the client taps agree or decline;
+  `POST /api/commit/:token` records it and locks in the fee on agree. Owner-side,
+  `POST /api/commitments` sets a state manually and `GET /api/rollout` returns waves,
+  tracker rows, and totals in one call. `POST /api/waves` saves a wave's schedule.
+- **Nothing auto-sends.** The link is generated for you to send; the tool never contacts a
+  client on its own.
 
 ## The Words (Step 4)
 
@@ -87,6 +107,11 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/decisions` | POST | Save one decision (`{ client_id, action, new_fee? }`) |
 | `/api/words/generate` | POST | Draft a message for a decision (`{ client_id }`) |
 | `/api/words/save` | POST | Save the final message (`{ client_id, message }`) |
+| `/api/rollout` | GET | Waves, tracker rows, and committed/potential totals |
+| `/api/waves` | POST | Set a wave's send date + status (`{ type, send_date?, status }`) |
+| `/api/commitments` | POST | Owner sets a client's state (`{ client_id, state }`) |
+| `/c/:token` | GET | **Public** commitment confirm page |
+| `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
 
 Every route except the auth request/verify requires a valid session, and every query is
 scoped to the firm behind that session.
@@ -161,14 +186,16 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth; 0002 client; 0003 decision)
+  migrations/           D1 schema (0001 auth; 0002 client; 0003 decision; 0004 rollout)
   src/
-    index.ts            Worker router: auth + clients + import + decisions
-    db.ts               D1 queries (firm, tokens, sessions, clients, decisions)
+    index.ts            Worker router: auth, clients, import, decisions, words, rollout
+    db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)
     crypto.ts           token generation, hashing, cookie parsing
     email.ts            Resend adapter with a dev fallback
     scoring.ts          realized rate, A-D tiering, numeric parsing
     words.ts            message templates + voice guardrail + optional LLM
+    rollout.ts          wave order/labels + proposed-fee logic
+    commit_page.ts      public commitment confirm page (HTML)
     import/
       csv.ts            CSV parser (quotes, commas, CRLF)
       importer.ts       Importer adapter interface + SpreadsheetImporter

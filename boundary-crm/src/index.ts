@@ -16,10 +16,18 @@ import {
   getDecisionForClient,
   setDraftedMessage,
   getClient,
+  getWaves,
+  upsertWave,
+  getCommitments,
+  upsertCommitment,
+  getCommitmentContextByToken,
+  setCommitmentStateByToken,
   type NewClient,
 } from "./db";
-import type { Action } from "./types";
+import type { Action, WaveType, WaveStatus, CommitmentState } from "./types";
 import { generateWords } from "./words";
+import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
+import { renderCommitPage } from "./commit_page";
 import { sendMagicLink } from "./email";
 import { SpreadsheetImporter } from "./import/importer";
 import { suggestMapping, refineWithLLM, CLIENT_FIELDS } from "./import/mapping";
@@ -42,6 +50,13 @@ export default {
       }
       if (pathname === "/auth/verify" && request.method === "GET") {
         return await handleVerify(env, url);
+      }
+      // Public commitment confirm page + response (token-authenticated, no session).
+      if (pathname.startsWith("/c/") && request.method === "GET") {
+        return await handleCommitPage(env, decodeURIComponent(pathname.slice(3)));
+      }
+      if (pathname.startsWith("/api/commit/") && request.method === "POST") {
+        return await handleCommitRespond(request, env, decodeURIComponent(pathname.slice("/api/commit/".length)));
       }
       if (pathname === "/api/me" && request.method === "GET") {
         return await handleMe(request, env);
@@ -69,6 +84,15 @@ export default {
       }
       if (pathname === "/api/words/save" && request.method === "POST") {
         return await handleWordsSave(request, env);
+      }
+      if (pathname === "/api/rollout" && request.method === "GET") {
+        return await handleRollout(request, env);
+      }
+      if (pathname === "/api/waves" && request.method === "POST") {
+        return await handleSaveWave(request, env);
+      }
+      if (pathname === "/api/commitments" && request.method === "POST") {
+        return await handleSaveCommitment(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -345,6 +369,152 @@ async function handleWordsSave(request: Request, env: Env): Promise<Response> {
 
   const saved = await setDraftedMessage(env, firm.id, b.client_id, b.message);
   return json({ decision: saved });
+}
+
+const WAVE_STATUSES: WaveStatus[] = ["draft", "scheduled", "sent"];
+const COMMIT_STATES: CommitmentState[] = ["told", "silent", "agreed", "declined"];
+
+/** GET /api/rollout — waves + tracker rows + committed-revenue total. */
+async function handleRollout(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  const [clients, decisions, waves, commitments] = await Promise.all([
+    listClients(env, firm.id),
+    getDecisions(env, firm.id),
+    getWaves(env, firm.id),
+    getCommitments(env, firm.id),
+  ]);
+  const byId = new Map(clients.map((c) => [c.id, c]));
+  const waveByType = new Map(waves.map((w) => [w.type, w]));
+  const commByClient = new Map(commitments.map((c) => [c.client_id, c]));
+
+  const wavesOut = WAVE_ORDER.map((type) => {
+    const members = decisions
+      .filter((d) => d.action === type)
+      .map((d) => {
+        const c = byId.get(d.client_id);
+        return c ? { client_id: c.id, name: c.name, tier: c.tier, fee: proposedFee(c, d) } : null;
+      })
+      .filter((m): m is NonNullable<typeof m> => m != null);
+    const meta = waveByType.get(type);
+    return {
+      type,
+      label: WAVE_META[type].label,
+      blurb: WAVE_META[type].blurb,
+      count: members.length,
+      revenue: members.reduce((s, m) => s + m.fee, 0),
+      send_date: meta?.send_date ?? null,
+      status: meta?.status ?? "draft",
+      members,
+    };
+  });
+
+  const tracker = decisions
+    .map((d) => {
+      const c = byId.get(d.client_id);
+      if (!c) return null;
+      const comm = commByClient.get(d.client_id) ?? null;
+      return {
+        client: { id: c.id, name: c.name, tier: c.tier, entity_type: c.entity_type },
+        action: d.action,
+        proposed_fee: proposedFee(c, d),
+        state: comm?.state ?? null,
+        link_token: comm?.link_token ?? null,
+        committed_fee: comm?.committed_fee ?? null,
+      };
+    })
+    .filter((t): t is NonNullable<typeof t> => t != null);
+
+  const total_committed = commitments
+    .filter((x) => x.state === "agreed")
+    .reduce((s, x) => s + (x.committed_fee ?? 0), 0);
+  const potential = tracker
+    .filter((t) => t.action !== "fire")
+    .reduce((s, t) => s + t.proposed_fee, 0);
+
+  return json({ waves: wavesOut, tracker, total_committed, potential });
+}
+
+/** POST /api/waves { type, send_date?, status } — set a wave's schedule. */
+async function handleSaveWave(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const b = body as { type?: unknown; send_date?: unknown; status?: unknown };
+  if (typeof b.type !== "string" || !WAVE_ORDER.includes(b.type as WaveType)) {
+    return json({ error: "invalid_type" }, 400);
+  }
+  const status = typeof b.status === "string" && WAVE_STATUSES.includes(b.status as WaveStatus)
+    ? (b.status as WaveStatus)
+    : "draft";
+  const sendDate = typeof b.send_date === "string" && b.send_date.trim() !== "" ? b.send_date.trim() : null;
+
+  const wave = await upsertWave(env, firm.id, b.type as WaveType, sendDate, status);
+  return json({ wave });
+}
+
+/** POST /api/commitments { client_id, state } — owner sets a client's response state. */
+async function handleSaveCommitment(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const b = body as { client_id?: unknown; state?: unknown };
+  if (typeof b.client_id !== "string") return json({ error: "bad_request" }, 400);
+  if (typeof b.state !== "string" || !COMMIT_STATES.includes(b.state as CommitmentState)) {
+    return json({ error: "invalid_state" }, 400);
+  }
+  const state = b.state as CommitmentState;
+
+  const client = await getClient(env, firm.id, b.client_id);
+  if (!client) return json({ error: "not_found" }, 404);
+  const decision = await getDecisionForClient(env, firm.id, b.client_id);
+  if (!decision) return json({ error: "no_decision" }, 400);
+
+  const committed_fee = state === "agreed" ? proposedFee(client, decision) : 0;
+  const commitment = await upsertCommitment(env, firm.id, b.client_id, { state, committed_fee });
+  return json({ commitment });
+}
+
+/** GET /c/:token — public confirm page. */
+async function handleCommitPage(env: Env, token: string): Promise<Response> {
+  const ctx = await getCommitmentContextByToken(env, token);
+  const html = renderCommitPage(ctx, token);
+  return new Response(html, {
+    status: ctx ? 200 : 404,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/** POST /api/commit/:token { response } — public agree/decline. */
+async function handleCommitRespond(request: Request, env: Env, token: string): Promise<Response> {
+  const ctx = await getCommitmentContextByToken(env, token);
+  if (!ctx) return json({ error: "not_found" }, 404);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const response = (body as { response?: unknown }).response;
+  if (response !== "agreed" && response !== "declined") return json({ error: "bad_request" }, 400);
+
+  const fee = response === "agreed" ? proposedFee(ctx.client, ctx.decision) : 0;
+  await setCommitmentStateByToken(env, token, response, fee);
+  return json({ ok: true, state: response });
 }
 
 /** Read a CSV body from either raw text or a JSON { csv } envelope. */

@@ -34,6 +34,29 @@ export interface Decision {
   decided_at: number;
 }
 
+export type WaveType = Action;
+export type WaveStatus = "draft" | "scheduled" | "sent";
+
+export interface Wave {
+  id: string;
+  firm_id: string;
+  type: WaveType;
+  send_date: string | null;
+  status: WaveStatus;
+}
+
+export type CommitmentState = "told" | "silent" | "agreed" | "declined";
+
+export interface Commitment {
+  id: string;
+  client_id: string;
+  firm_id: string;
+  link_token: string;
+  state: CommitmentState;
+  committed_fee: number | null;
+  updated_at: number;
+}
+
 export interface Client {
   id: string;
   firm_id: string;

@@ -1,4 +1,7 @@
-import type { Env, Firm, Client, Tier, Action, Decision } from "./types";
+import type {
+  Env, Firm, Client, Tier, Action, Decision,
+  Wave, WaveType, WaveStatus, Commitment, CommitmentState,
+} from "./types";
 import { randomToken, sha256Hex } from "./crypto";
 
 const MAGIC_TTL_MS = 15 * 60 * 1000; // 15 minutes
@@ -233,4 +236,118 @@ export async function setDraftedMessage(
     .bind(message, clientId, firmId)
     .run();
   return getDecisionForClient(env, firmId, clientId);
+}
+
+// ---- waves ----
+
+export async function getWaves(env: Env, firmId: string): Promise<Wave[]> {
+  const res = await env.DB.prepare("SELECT * FROM wave WHERE firm_id = ?").bind(firmId).all<Wave>();
+  return res.results ?? [];
+}
+
+/** Set a wave's send date and status, creating the wave row on first touch. */
+export async function upsertWave(
+  env: Env,
+  firmId: string,
+  type: WaveType,
+  sendDate: string | null,
+  status: WaveStatus
+): Promise<Wave> {
+  await env.DB.prepare(
+    `INSERT INTO wave (id, firm_id, type, send_date, status)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(firm_id, type) DO UPDATE SET send_date = excluded.send_date, status = excluded.status`
+  )
+    .bind(crypto.randomUUID(), firmId, type, sendDate, status)
+    .run();
+  const row = await env.DB.prepare("SELECT * FROM wave WHERE firm_id = ? AND type = ?")
+    .bind(firmId, type)
+    .first<Wave>();
+  return row!;
+}
+
+// ---- commitments ----
+
+export async function getCommitments(env: Env, firmId: string): Promise<Commitment[]> {
+  const res = await env.DB.prepare("SELECT * FROM commitment WHERE firm_id = ?").bind(firmId).all<Commitment>();
+  return res.results ?? [];
+}
+
+export async function getCommitmentByClient(env: Env, firmId: string, clientId: string): Promise<Commitment | null> {
+  const row = await env.DB.prepare("SELECT * FROM commitment WHERE client_id = ? AND firm_id = ?")
+    .bind(clientId, firmId)
+    .first<Commitment>();
+  return row ?? null;
+}
+
+/**
+ * Create or update a client's commitment. A link_token is minted once on
+ * creation and never changes. Fields left undefined keep their current value.
+ */
+export async function upsertCommitment(
+  env: Env,
+  firmId: string,
+  clientId: string,
+  opts: { state?: CommitmentState; committed_fee?: number | null }
+): Promise<Commitment> {
+  const now = Date.now();
+  const existing = await getCommitmentByClient(env, firmId, clientId);
+  if (existing) {
+    const state = opts.state ?? existing.state;
+    const fee = opts.committed_fee !== undefined ? opts.committed_fee : existing.committed_fee;
+    await env.DB.prepare("UPDATE commitment SET state = ?, committed_fee = ?, updated_at = ? WHERE id = ?")
+      .bind(state, fee, now, existing.id)
+      .run();
+    return { ...existing, state, committed_fee: fee, updated_at: now };
+  }
+  const commitment: Commitment = {
+    id: crypto.randomUUID(),
+    client_id: clientId,
+    firm_id: firmId,
+    link_token: randomToken(),
+    state: opts.state ?? "told",
+    committed_fee: opts.committed_fee ?? null,
+    updated_at: now,
+  };
+  await env.DB.prepare(
+    `INSERT INTO commitment (id, client_id, firm_id, link_token, state, committed_fee, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      commitment.id, commitment.client_id, commitment.firm_id, commitment.link_token,
+      commitment.state, commitment.committed_fee, commitment.updated_at
+    )
+    .run();
+  return commitment;
+}
+
+/** Public lookup by link token: the commitment plus the client and decision it references. */
+export async function getCommitmentContextByToken(
+  env: Env,
+  token: string
+): Promise<{ commitment: Commitment; client: Client; decision: Decision } | null> {
+  const commitment = await env.DB.prepare("SELECT * FROM commitment WHERE link_token = ?")
+    .bind(token)
+    .first<Commitment>();
+  if (!commitment) return null;
+  const client = await env.DB.prepare("SELECT * FROM client WHERE id = ?")
+    .bind(commitment.client_id)
+    .first<Client>();
+  const decision = await env.DB.prepare("SELECT * FROM decision WHERE client_id = ?")
+    .bind(commitment.client_id)
+    .first<Decision>();
+  if (!client || !decision) return null;
+  return { commitment, client, decision };
+}
+
+/** Public state change from the confirm page. */
+export async function setCommitmentStateByToken(
+  env: Env,
+  token: string,
+  state: CommitmentState,
+  committedFee: number | null
+): Promise<void> {
+  await env.DB.prepare("UPDATE commitment SET state = ?, committed_fee = ?, updated_at = ? WHERE link_token = ?")
+    .bind(state, committedFee, Date.now(), token)
+    .run();
 }
