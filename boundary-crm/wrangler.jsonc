@@ -22,6 +22,12 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers AI, used only for optional LLM refinement of column mapping.
+  // Import works without it (heuristic mapping); the model just fills in
+  // low-confidence guesses when reachable.
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     // Owner-facing sender for the sign-in email. Override per environment.
     // RESEND_API_KEY is a secret, set it with `wrangler secret put RESEND_API_KEY`.

@@ -1,4 +1,4 @@
-import type { Env } from "./types";
+import type { Env, Firm } from "./types";
 import { parseCookies } from "./crypto";
 import {
   getOrCreateFirm,
@@ -7,8 +7,18 @@ import {
   createSession,
   getFirmBySession,
   deleteSession,
+  insertClients,
+  listClients,
+  deleteClientsForFirm,
+  type NewClient,
 } from "./db";
 import { sendMagicLink } from "./email";
+import { SpreadsheetImporter } from "./import/importer";
+import { suggestMapping, refineWithLLM, CLIENT_FIELDS } from "./import/mapping";
+import { realizedRate, computeTiers, parseNumeric } from "./scoring";
+
+const MAX_CSV_BYTES = 2_000_000; // 2 MB
+const MAX_ROWS = 5000;
 
 const SESSION_COOKIE = "bcrm_session";
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // seconds
@@ -30,6 +40,15 @@ export default {
       }
       if (pathname === "/api/auth/logout" && request.method === "POST") {
         return await handleLogout(request, env);
+      }
+      if (pathname === "/api/clients" && request.method === "GET") {
+        return await handleListClients(request, env);
+      }
+      if (pathname === "/api/import/preview" && request.method === "POST") {
+        return await handleImportPreview(request, env);
+      }
+      if (pathname === "/api/import/commit" && request.method === "POST") {
+        return await handleImportCommit(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -100,6 +119,148 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
   const headers = new Headers({ "Content-Type": "application/json" });
   headers.append("Set-Cookie", sessionCookie("", 0));
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+}
+
+/** Resolve the signed-in firm from the session cookie, or null. */
+async function firmFromRequest(request: Request, env: Env): Promise<Firm | null> {
+  const cookies = parseCookies(request.headers.get("Cookie"));
+  return getFirmBySession(env, cookies[SESSION_COOKIE]);
+}
+
+/** GET /api/clients — the firm's clients with a tier breakdown. */
+async function handleListClients(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const clients = await listClients(env, firm.id);
+  return json({ clients, tiers: tierCounts(clients), count: clients.length });
+}
+
+/** POST /api/import/preview { csv } — parse and suggest a column mapping. */
+async function handleImportPreview(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  const csv = await readCsvBody(request);
+  if (csv === null) return json({ error: "invalid_csv" }, 400);
+  if (csv.length > MAX_CSV_BYTES) return json({ error: "too_large" }, 413);
+
+  const table = new SpreadsheetImporter().parse(csv);
+  if (table.headers.length === 0) return json({ error: "empty" }, 400);
+  if (table.rows.length > MAX_ROWS) return json({ error: "too_many_rows", max: MAX_ROWS }, 413);
+
+  const sample = table.rows.slice(0, 5);
+  let suggestions = suggestMapping(table.headers);
+  suggestions = await refineWithLLM(env, table.headers, sample, suggestions);
+
+  return json({
+    headers: table.headers,
+    sample,
+    rowCount: table.rows.length,
+    suggestions,
+  });
+}
+
+/** POST /api/import/commit { csv, mapping, replace? } — write clients. */
+async function handleImportCommit(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const b = body as { csv?: unknown; mapping?: unknown; replace?: unknown };
+  if (typeof b.csv !== "string" || !b.mapping || typeof b.mapping !== "object") {
+    return json({ error: "bad_request" }, 400);
+  }
+  if (b.csv.length > MAX_CSV_BYTES) return json({ error: "too_large" }, 413);
+
+  const mapping = b.mapping as Record<string, string | null>;
+  const table = new SpreadsheetImporter().parse(b.csv);
+  if (table.headers.length === 0) return json({ error: "empty" }, 400);
+  if (table.rows.length > MAX_ROWS) return json({ error: "too_many_rows", max: MAX_ROWS }, 413);
+
+  // Column header -> index, and each field -> its chosen column index.
+  const colIndex = new Map<string, number>();
+  table.headers.forEach((h, i) => colIndex.set(h, i));
+  const fieldCol = new Map<string, number>();
+  for (const f of CLIENT_FIELDS) {
+    const col = mapping[f.key];
+    if (typeof col === "string" && colIndex.has(col)) fieldCol.set(f.key, colIndex.get(col)!);
+  }
+  if (!fieldCol.has("name")) return json({ error: "name_unmapped" }, 400);
+
+  const cell = (row: string[], field: string): string | null => {
+    const idx = fieldCol.get(field);
+    if (idx === undefined) return null;
+    const v = row[idx];
+    return v == null ? null : v.trim();
+  };
+
+  let skipped = 0;
+  const staged: NewClient[] = [];
+  for (const row of table.rows) {
+    const name = cell(row, "name");
+    if (!name) {
+      skipped++;
+      continue;
+    }
+    const annual_fee = parseNumeric(cell(row, "annual_fee"));
+    const est_hours = parseNumeric(cell(row, "est_hours"));
+    staged.push({
+      name,
+      entity_type: emptyToNull(cell(row, "entity_type")),
+      return_type: emptyToNull(cell(row, "return_type")),
+      annual_fee,
+      est_hours,
+      realized_rate: realizedRate(annual_fee, est_hours),
+      tier: null,
+    });
+  }
+
+  if (staged.length === 0) return json({ error: "no_rows", skipped }, 400);
+
+  const tiers = computeTiers(staged, (c) => c.realized_rate);
+  staged.forEach((c, i) => (c.tier = tiers[i]));
+
+  if (b.replace === true) await deleteClientsForFirm(env, firm.id);
+  const created = await insertClients(env, firm.id, staged);
+  const all = await listClients(env, firm.id);
+
+  return json({
+    imported: created.length,
+    skipped,
+    tiers: tierCounts(created),
+    clients: all,
+    count: all.length,
+  });
+}
+
+/** Read a CSV body from either raw text or a JSON { csv } envelope. */
+async function readCsvBody(request: Request): Promise<string | null> {
+  const type = request.headers.get("Content-Type") || "";
+  if (type.includes("application/json")) {
+    try {
+      const body = (await request.json()) as { csv?: unknown };
+      return typeof body.csv === "string" ? body.csv : null;
+    } catch {
+      return null;
+    }
+  }
+  const text = await request.text();
+  return text.length > 0 ? text : null;
+}
+
+function tierCounts(clients: { tier: string | null }[]): Record<string, number> {
+  const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, unranked: 0 };
+  for (const c of clients) counts[c.tier ?? "unranked"]++;
+  return counts;
+}
+
+function emptyToNull(s: string | null): string | null {
+  return s && s.length > 0 ? s : null;
 }
 
 // ---- helpers ----
