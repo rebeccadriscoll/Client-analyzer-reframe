@@ -570,6 +570,47 @@
     .track-right { justify-content: flex-start; }
     .wave-figures { text-align: left; }
   }
+
+  /* ===== FEAR KILLER ===== */
+  .fear-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+  @media (max-width: 640px) { .fear-sliders { grid-template-columns: 1fr; } }
+  .fslider-card {
+    background: white; border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm); border: 1px solid rgba(31,58,61,0.08);
+  }
+  .fslider-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .fslider-head > span:first-child { font-size: 13px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; }
+  .fslider-val { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; color: var(--navy); }
+  .fslider-sub { font-size: 12px; color: var(--gray); margin-top: 12px; }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 100px;
+    background: var(--cream-deep); outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--coral); border: 3px solid white; box-shadow: var(--shadow-sm); cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--coral); border: 3px solid white; box-shadow: var(--shadow-sm); cursor: pointer;
+  }
+
+  .fear-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+  @media (max-width: 720px) { .fear-stats { grid-template-columns: repeat(2, 1fr); } }
+  .fstat { background: white; border-radius: 14px; padding: 18px; box-shadow: var(--shadow-sm); border: 1px solid rgba(31,58,61,0.08); }
+  .fstat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gray); margin-bottom: 8px; }
+  .fstat-value { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+  .fstat-value.neg { color: var(--tier-d); }
+  .fstat-value.pos { color: var(--tier-a); }
+  .fstat-sub { font-size: 11px; color: var(--gray); margin-top: 6px; }
+
+  .fear-verdict {
+    background: white; border-radius: 16px; padding: 20px 24px; box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--gray-light); font-size: 15px; line-height: 1.6; color: var(--navy);
+  }
+  .fear-verdict.ok { border-left-color: var(--tier-a); }
+  .fear-verdict.warn { border-left-color: var(--coral-deep); background: rgba(196,69,54,0.05); }
+  .fear-verdict b { font-weight: 700; }
+  .fear-verdict .cut-names { font-size: 13px; color: var(--gray); margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -815,11 +856,32 @@
           </div>
           <p class="section-help">Two sliders. See the math beat the fear.</p>
         </div>
-        <div class="placeholder">
+        <div id="fearEmpty" class="placeholder" style="display:none;">
           <div class="icon">🧮</div>
-          <h3>The Fear Killer is coming</h3>
-          <p>Drag two sliders: how many clients to cut and your new minimum fee. Watch revenue let go, revenue from raises, net change, and hours back.</p>
-          <span class="step-chip">Build Step 6</span>
+          <h3>Import your clients first</h3>
+          <p>The Fear Killer runs on your real book. Once your clients are in, drag the sliders and watch the math.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('import', document.querySelector('.tabnav button'))">Go to import</button>
+        </div>
+        <div id="fearMain" style="display:none;">
+          <div class="fear-sliders">
+            <div class="fslider-card">
+              <div class="fslider-head"><span>Clients to let go</span><span class="fslider-val" id="cutVal">0</span></div>
+              <input type="range" id="cutSlider" min="0" max="0" value="0">
+              <div class="fslider-sub">Cuts your lowest realized-rate clients first.</div>
+            </div>
+            <div class="fslider-card">
+              <div class="fslider-head"><span>New minimum fee</span><span class="fslider-val" id="minVal">$0</span></div>
+              <input type="range" id="minSlider" min="0" max="0" step="50" value="0">
+              <div class="fslider-sub">Kept clients under this get raised up to it.</div>
+            </div>
+          </div>
+          <div class="fear-stats">
+            <div class="fstat"><div class="fstat-label">Revenue let go</div><div class="fstat-value neg" id="fLetGo">$0</div><div class="fstat-sub">from clients you cut</div></div>
+            <div class="fstat"><div class="fstat-label">Revenue from raises</div><div class="fstat-value pos" id="fRaises">$0</div><div class="fstat-sub">kept clients lifted to the floor</div></div>
+            <div class="fstat"><div class="fstat-label">Net change</div><div class="fstat-value" id="fNet">$0</div><div class="fstat-sub">raises minus what you let go</div></div>
+            <div class="fstat"><div class="fstat-label">Hours back</div><div class="fstat-value" id="fHours">0</div><div class="fstat-sub">freed for better work</div></div>
+          </div>
+          <div class="fear-verdict" id="fearVerdict"></div>
         </div>
       </div>
 
@@ -908,6 +970,7 @@
     if (id === 'decide') loadDecide();
     if (id === 'words') loadWords();
     if (id === 'rollout' || id === 'tracker') loadRollout();
+    if (id === 'fear') loadFear();
   }
 
   // ---- auth flow ----
@@ -1830,6 +1893,95 @@
     btn.textContent = 'Copied link';
     setTimeout(function () { btn.textContent = orig; }, 1500);
   }
+
+  // ---- the fear killer (Section 06) ----
+  var fear = { clients: [], sorted: [] };
+
+  async function loadFear() {
+    try {
+      var res = await fetch('/api/clients');
+      if (!res.ok) return;
+      fear.clients = (await res.json()).clients || [];
+    } catch (e) { return; }
+    renderFear();
+  }
+
+  function renderFear() {
+    var empty = document.getElementById('fearEmpty');
+    var main = document.getElementById('fearMain');
+    if (fear.clients.length === 0) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+    empty.style.display = 'none'; main.style.display = 'block';
+
+    // Lowest realized rate first (clients with no rate sort last, by fee).
+    fear.sorted = fear.clients.slice().sort(function (a, b) {
+      var ar = a.realized_rate, br = b.realized_rate;
+      if (ar == null && br == null) return (a.annual_fee || 0) - (b.annual_fee || 0);
+      if (ar == null) return 1;
+      if (br == null) return -1;
+      return ar - br;
+    });
+
+    var cut = document.getElementById('cutSlider');
+    cut.max = fear.clients.length;
+    if (parseInt(cut.value, 10) > fear.clients.length) cut.value = 0;
+
+    var maxFee = fear.clients.reduce(function (m, c) { return Math.max(m, c.annual_fee || 0); }, 0);
+    var minS = document.getElementById('minSlider');
+    minS.max = Math.max(Math.ceil(maxFee / 500) * 500, 1000);
+
+    computeFear();
+  }
+
+  function computeFear() {
+    var cutCount = parseInt(document.getElementById('cutSlider').value, 10) || 0;
+    var minFee = parseInt(document.getElementById('minSlider').value, 10) || 0;
+    document.getElementById('cutVal').textContent = cutCount;
+    document.getElementById('minVal').textContent = money(minFee);
+
+    var cutSet = fear.sorted.slice(0, cutCount);
+    var keptSet = fear.sorted.slice(cutCount);
+
+    var letGo = cutSet.reduce(function (s, c) { return s + (c.annual_fee || 0); }, 0);
+    var hoursBack = cutSet.reduce(function (s, c) { return s + (c.est_hours || 0); }, 0);
+    var fromRaises = keptSet.reduce(function (s, c) {
+      if (c.annual_fee == null) return s;
+      return s + Math.max(0, minFee - c.annual_fee);
+    }, 0);
+    var net = fromRaises - letGo;
+
+    document.getElementById('fLetGo').textContent = letGo > 0 ? '-' + money(letGo) : money(0);
+    document.getElementById('fRaises').textContent = fromRaises > 0 ? '+' + money(fromRaises) : money(0);
+    var netEl = document.getElementById('fNet');
+    netEl.textContent = (net >= 0 ? '+' : '-') + money(Math.abs(net));
+    netEl.className = 'fstat-value ' + (net >= 0 ? 'pos' : 'neg');
+    document.getElementById('fHours').textContent = hoursBack + (hoursBack === 1 ? ' hr' : ' hrs');
+
+    renderFearVerdict(cutCount, cutSet, minFee, net, hoursBack);
+  }
+
+  function renderFearVerdict(cutCount, cutSet, minFee, net, hoursBack) {
+    var el = document.getElementById('fearVerdict');
+    if (cutCount === 0 && minFee === 0) {
+      el.className = 'fear-verdict';
+      el.innerHTML = 'Drag the sliders. Let go of your lowest clients, set a floor under your fees, and watch where revenue actually lands. The math is almost always kinder than the fear.';
+      return;
+    }
+    var parts = [];
+    if (cutCount > 0) parts.push('Letting go of <b>' + cutCount + ' client' + (cutCount === 1 ? '' : 's') + '</b> frees <b>' + hoursBack + ' hour' + (hoursBack === 1 ? '' : 's') + '</b>');
+    if (minFee > 0) parts.push((parts.length ? 'and a ' : 'A ') + '<b>' + money(minFee) + '</b> minimum lifts your kept fees');
+    var lead = parts.join(' ') + '.';
+    var tail = net >= 0
+      ? ' You come out <b>ahead by ' + money(net) + '</b>. The fear said you could not afford to. The math says otherwise.'
+      : ' That is <b>' + money(-net) + '</b> less for now. Nudge the minimum up a little and the gap usually closes.';
+    el.className = 'fear-verdict ' + (net >= 0 ? 'ok' : 'warn');
+    var names = cutSet.length
+      ? '<div class="cut-names">Letting go: ' + cutSet.slice(0, 6).map(function (c) { return esc(c.name); }).join(', ') + (cutSet.length > 6 ? ' and ' + (cutSet.length - 6) + ' more' : '') + '.</div>'
+      : '';
+    el.innerHTML = lead + tail + names;
+  }
+
+  document.getElementById('cutSlider').addEventListener('input', computeFear);
+  document.getElementById('minSlider').addEventListener('input', computeFear);
 
   checkSession();
 </script>

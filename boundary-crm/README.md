@@ -14,8 +14,21 @@ Built so far:
   in a warm, plain voice, saved onto the decision.
 - **Step 5 — Rollout + Tracker.** Decisions organized into send waves; commitment links
   with told/silent/agreed/declined states and a live committed-revenue total.
+- **Step 6 — Fear Killer.** Two sliders over your real book: revenue let go, revenue from
+  raises, net change, and hours back.
 
-The Fear Killer arrives in the last step.
+All six Phase 0 sections are now built.
+
+## Fear Killer (Step 6)
+
+A live calculator over your imported clients, no saving involved. Two sliders:
+
+- **Clients to let go** cuts your lowest realized-rate clients first.
+- **New minimum fee** raises every kept client that sits below it up to the floor.
+
+It shows revenue let go, revenue from raises, net change, and hours back, with a
+plain-language verdict and the names of who would be let go. Runs entirely client-side
+from `GET /api/clients`.
 
 ## Rollout and tracker (Step 5)
 
