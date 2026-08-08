@@ -1,0 +1,20 @@
+{
+  "name": "boundary-crm",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Boundary CRM — the paid product the Client Analyzer graduates into. Phase 0, Step 1: auth + themed shell.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:create": "wrangler d1 create boundary_crm",
+    "db:migrate:local": "wrangler d1 migrations apply boundary_crm --local",
+    "db:migrate:remote": "wrangler d1 migrations apply boundary_crm --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.0.0"
+  }
+}

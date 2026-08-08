@@ -1,0 +1,36 @@
+{
+  // Boundary CRM — Cloudflare Worker with static assets + D1.
+  // The static shell lives in ./public and is served by the ASSETS binding.
+  // The Worker (src/index.ts) handles /api/* and the magic-link /auth/verify route.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "boundary-crm",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-06",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Non-asset paths fall through to the Worker (so /api/* is never swallowed
+    // by a single-page-application fallback). The Worker serves the shell itself.
+    "not_found_handling": "none"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "boundary_crm",
+      // Run `npm run db:create` and paste the returned id here before deploying.
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Workers AI, used only for optional LLM refinement of column mapping.
+  // Import works without it (heuristic mapping); the model just fills in
+  // low-confidence guesses when reachable.
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    // Owner-facing sender for the sign-in email. Override per environment.
+    // RESEND_API_KEY is a secret, set it with `wrangler secret put RESEND_API_KEY`.
+    "MAIL_FROM": "Boundary CRM <login@example.com>"
+  }
+}
