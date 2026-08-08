@@ -500,6 +500,10 @@
   .voice-banner.busy { background: var(--cream-deep); color: var(--gray); }
   .act-voice { color: var(--coral-deep) !important; }
   .act-voice:disabled { opacity: 0.45; cursor: default; }
+  .act-send { background: var(--tier-a) !important; color: #fff !important; }
+  .act-send:hover { filter: brightness(1.05); }
+  .act-send:disabled { opacity: 0.45; cursor: default; filter: none; }
+  .word-status.err { color: var(--tier-d); }
 
   /* ===== ROLLOUT (waves) ===== */
   .wave-card {
@@ -1080,6 +1084,7 @@
   // ---- import (Section 01) ----
   var FIELDS = [
     { key: 'name', label: 'Client name', required: true },
+    { key: 'email', label: 'Client email', required: false },
     { key: 'entity_type', label: 'Entity type', required: false },
     { key: 'return_type', label: 'Return type', required: false },
     { key: 'annual_fee', label: 'Annual fee', required: true },
@@ -1688,7 +1693,8 @@
     var card = document.createElement('div');
     card.className = 'word-card';
     card.dataset.cid = c.id;
-    var sub = (d.action === 'raise' && d.new_fee != null) ? ('New fee ' + money(d.new_fee)) : (c.entity_type || '');
+    var sub = (d.action === 'raise' && d.new_fee != null ? 'New fee ' + money(d.new_fee) + ' · ' : '') +
+      (c.email ? c.email : 'No email on file');
     card.innerHTML =
       '<div class="word-head">' +
         '<span class="word-name"></span>' +
@@ -1703,6 +1709,7 @@
         '<button class="btn btn-ghost act-voice" title="Save this wording as your voice and redraft the others to match">Draft the rest in my voice</button>' +
         '<button class="btn btn-ghost act-copy">Copy</button>' +
         '<button class="btn btn-primary act-save" disabled>Save</button>' +
+        '<button class="btn act-send" disabled>Send</button>' +
         '<span class="word-status"></span>' +
       '</div>';
     card.querySelector('.word-name').textContent = c.name;
@@ -1711,20 +1718,39 @@
     var saveBtn = card.querySelector('.act-save');
     var draftBtn = card.querySelector('.act-draft');
     var voiceBtn = card.querySelector('.act-voice');
+    var sendBtn = card.querySelector('.act-send');
     var status = card.querySelector('.word-status');
     ta.value = d.drafted_message || '';
     draftBtn.textContent = d.drafted_message ? 'Regenerate' : 'Draft message';
     if (d.drafted_message) { status.className = 'word-status saved'; status.textContent = 'Saved'; }
     voiceBtn.disabled = ta.value.trim().length < 10;
+    sendBtn.disabled = !c.email || ta.value.trim() === '';
+    if (!c.email) sendBtn.title = 'No email on file. Re-import your clients with an email column to send.';
 
-    function markUnsaved() {
-      var empty = ta.value.trim() === '';
-      saveBtn.disabled = empty;
+    function refreshSendVoice() {
       voiceBtn.disabled = ta.value.trim().length < 10;
+      sendBtn.disabled = !c.email || ta.value.trim() === '';
+    }
+    var saveTimer = null;
+    function markUnsaved() {
+      saveBtn.disabled = ta.value.trim() === '';
+      refreshSendVoice();
       status.className = 'word-status unsaved';
-      status.textContent = empty ? '' : 'Unsaved changes';
+      status.textContent = ta.value.trim() === '' ? '' : 'Unsaved changes';
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(doAutosave, 900);
+    }
+    async function doAutosave() {
+      if (ta.value.trim() === '') return;
+      try {
+        var res = await fetch('/api/words/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id, message: ta.value })
+        });
+        if (res.ok) { d.drafted_message = ta.value; status.className = 'word-status saved'; status.textContent = 'Saved'; saveBtn.disabled = true; refreshSendVoice(); }
+      } catch (e) { /* keep as unsaved */ }
     }
     ta.addEventListener('input', markUnsaved);
+    ta.addEventListener('blur', function () { if (saveTimer) clearTimeout(saveTimer); doAutosave(); });
 
     voiceBtn.addEventListener('click', async function () {
       if (ta.value.trim().length < 10) return;
@@ -1767,7 +1793,35 @@
       } catch (e) { saveBtn.textContent = prev; saveBtn.disabled = false; }
     });
 
+    sendBtn.addEventListener('click', async function () {
+      if (!c.email || ta.value.trim() === '') return;
+      if (!window.confirm('Send this message to ' + c.email + '?\n\nThis emails the client their message and confirm link, and marks them as told.')) return;
+      var prev = sendBtn.textContent;
+      sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+      try {
+        // Make the saved copy match what is on screen, then send.
+        await fetch('/api/words/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id, message: ta.value }) });
+        d.drafted_message = ta.value;
+        var res = await fetch('/api/words/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id }) });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok) { sendBtn.textContent = 'Sent ✓'; status.className = 'word-status saved'; status.textContent = 'Sent · marked told'; }
+        else { sendBtn.textContent = 'Send'; sendBtn.disabled = false; status.className = 'word-status err'; status.textContent = sendErr(data); }
+      } catch (e) {
+        sendBtn.textContent = 'Send'; sendBtn.disabled = false; status.className = 'word-status err'; status.textContent = 'Could not send. Try again.';
+      }
+    });
+
     return card;
+  }
+
+  function sendErr(d) {
+    switch (d && d.error) {
+      case 'no_email': return 'No email on file for this client.';
+      case 'no_message': return 'Write a message first.';
+      case 'email_not_configured': return 'Add your Brevo key to the Worker first.';
+      case 'no_decision': return 'Decide on this client first.';
+      default: return 'Could not send. Try again.';
+    }
   }
 
   // Save the owner's own wording as a voice sample, then redraft every other

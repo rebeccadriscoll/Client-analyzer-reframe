@@ -58,11 +58,14 @@ the client name and, for raises, the old and new fee.
   action) are the default, so drafts always comply; when a Workers AI binding is present,
   an optional call may replace the draft and the result is still run through the same
   `sanitizeVoice` net. The prompt stays server-side.
-- **Nothing auto-sends.** The tool drafts; you edit and send. The message is saved on the
-  decision only when you click Save.
+- **Nothing auto-sends.** The tool drafts; you edit and send. Drafts **autosave** as you
+  type (debounced), so nothing is lost on exit; Save is still there for an explicit save.
+- **Send** emails the message straight to the client (via Brevo) with their confirm link,
+  and marks them told — one client at a time, owner-initiated. Requires the client to have
+  an email (a mappable import field) and `BREVO_API_KEY` to be set.
 
-Backed by `POST /api/words/generate` (`{ client_id }` → draft) and `POST /api/words/save`
-(`{ client_id, message }`), both firm-scoped and requiring an existing decision.
+Backed by `POST /api/words/generate` (`{ client_id }` → draft), `POST /api/words/save`
+(`{ client_id, message }`), and `POST /api/words/send` (`{ client_id }`), all firm-scoped.
 
 ### Learn my voice (Claude)
 
@@ -136,6 +139,7 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/decisions` | POST | Save one decision (`{ client_id, action, new_fee? }`) |
 | `/api/words/generate` | POST | Draft a message for a decision (`{ client_id }`) |
 | `/api/words/save` | POST | Save the final message (`{ client_id, message }`) |
+| `/api/words/send` | POST | Email the message to the client + mark told (`{ client_id }`) |
 | `/api/rollout` | GET | Waves, tracker rows, and committed/potential totals |
 | `/api/waves` | POST | Set a wave's send date + status (`{ type, send_date?, status }`) |
 | `/api/commitments` | POST | Owner sets a client's state (`{ client_id, state }`) |
@@ -215,7 +219,7 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth; 0002 client; 0003 decision; 0004 rollout)
+  migrations/           D1 schema (0001 auth … 0004 rollout; 0005 voice; 0006 client email)
   src/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)

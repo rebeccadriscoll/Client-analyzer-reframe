@@ -1,7 +1,7 @@
 import type { Env } from "../types";
 
 export interface ClientField {
-  key: "name" | "entity_type" | "annual_fee" | "est_hours" | "return_type";
+  key: "name" | "email" | "entity_type" | "annual_fee" | "est_hours" | "return_type";
   label: string;
   required: boolean;
   synonyms: string[];
@@ -23,6 +23,12 @@ export const CLIENT_FIELDS: ClientField[] = [
     label: "Client name",
     required: true,
     synonyms: ["name", "client", "client name", "company", "business", "taxpayer", "account", "entity name", "customer"],
+  },
+  {
+    key: "email",
+    label: "Client email",
+    required: false,
+    synonyms: ["email", "e mail", "client email", "contact email", "email address", "primary email"],
   },
   {
     key: "entity_type",

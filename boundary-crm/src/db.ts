@@ -107,6 +107,7 @@ export async function deleteSession(env: Env, rawToken: string | undefined): Pro
 
 export interface NewClient {
   name: string;
+  email: string | null;
   entity_type: string | null;
   return_type: string | null;
   annual_fee: number | null;
@@ -122,6 +123,7 @@ export async function insertClients(env: Env, firmId: string, news: NewClient[])
     id: crypto.randomUUID(),
     firm_id: firmId,
     name: c.name,
+    email: c.email,
     entity_type: c.entity_type,
     return_type: c.return_type,
     annual_fee: c.annual_fee,
@@ -137,10 +139,10 @@ export async function insertClients(env: Env, firmId: string, news: NewClient[])
   const stmts = rows.map((c) =>
     env.DB.prepare(
       `INSERT INTO client
-         (id, firm_id, name, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      c.id, c.firm_id, c.name, c.entity_type, c.return_type,
+      c.id, c.firm_id, c.name, c.email, c.entity_type, c.return_type,
       c.annual_fee, c.est_hours, c.realized_rate, c.tier, c.flags, c.created_at
     )
   );

@@ -75,6 +75,7 @@ export interface Client {
   id: string;
   firm_id: string;
   name: string;
+  email: string | null;
   entity_type: string | null;
   return_type: string | null;
   annual_fee: number | null;
