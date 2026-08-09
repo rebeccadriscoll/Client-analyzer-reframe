@@ -652,6 +652,18 @@
   .followup-line { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--navy); }
   .followup-line.none { color: var(--gray); }
 
+  .checklist-card { background: white; border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm); border: 1px solid rgba(31,58,61,0.08); margin-bottom: 22px; }
+  .checklist-card h4 { font-family: 'Fraunces', serif; font-size: 17px; color: var(--navy); margin-bottom: 4px; }
+  .checklist-card .ck-sub { font-size: 13px; color: var(--gray); margin-bottom: 14px; }
+  .check-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; font-size: 14px; color: var(--navy); border-top: 1px solid rgba(31,58,61,0.06); }
+  .check-item:first-of-type { border-top: none; }
+  .check-box { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--gray-light); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: white; }
+  .check-item.done .check-box { background: var(--tier-a); border-color: var(--tier-a); }
+  .check-item.done .ci-label { color: var(--gray); }
+  .ci-go { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--coral-deep); background: none; border: none; cursor: pointer; padding: 4px 8px; }
+  .check-item.done .ci-go { display: none; }
+  .home-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+
   /* ===== MODAL (client detail) ===== */
   .modal-overlay { display: none; position: fixed; inset: 0; z-index: 60; background: rgba(21,40,43,0.55); padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .modal-overlay.show { display: flex; align-items: flex-start; justify-content: center; }
@@ -793,6 +805,11 @@
           <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('import', document.querySelectorAll('.tabnav button')[1])">Go to import</button>
         </div>
         <div id="homeMain" style="display:none;">
+          <div class="checklist-card" id="homeChecklist" style="display:none;">
+            <h4>Getting started</h4>
+            <div class="ck-sub">A few steps to get your first season moving.</div>
+            <div id="checklistItems"></div>
+          </div>
           <div class="next-card">
             <div>
               <div class="nc-label">Next step</div>
@@ -815,6 +832,10 @@
               <h4>Decisions</h4>
               <div id="homeDecisions"></div>
             </div>
+          </div>
+          <div class="home-actions">
+            <button class="btn btn-secondary" id="reportBtn">Print a summary</button>
+            <button class="btn btn-secondary" id="exportBtn">Export book (CSV)</button>
           </div>
         </div>
       </div>
@@ -2433,7 +2454,112 @@
     document.getElementById('homeDecisions').innerHTML = d.decided
       ? ac.map(function (r) { return tierBar(r[1], d.actions[r[0]] || 0, d.decided, r[2], '52px'); }).join('')
       : '<div class="notes-empty">No decisions yet.</div>';
+
+    renderChecklist(d);
   }
+
+  function renderChecklist(d) {
+    var steps = [
+      { done: !!firmSettings.name, label: 'Name your firm', kind: 'settings' },
+      { done: d.clients > 0, label: 'Import your clients', tab: 'import' },
+      { done: d.decided > 0, label: 'Make your first decision', tab: 'decide' },
+      { done: (d.contacted || 0) > 0, label: 'Send your first message', tab: 'words' }
+    ];
+    var card = document.getElementById('homeChecklist');
+    if (steps.every(function (s) { return s.done; })) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    document.getElementById('checklistItems').innerHTML = steps.map(function (s, i) {
+      return '<div class="check-item' + (s.done ? ' done' : '') + '">' +
+        '<div class="check-box">' + (s.done ? '✓' : '') + '</div>' +
+        '<span class="ci-label">' + s.label + '</span>' +
+        '<button class="ci-go" data-step="' + i + '">Do it</button></div>';
+    }).join('');
+    document.querySelectorAll('#checklistItems .ci-go').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var s = steps[parseInt(b.getAttribute('data-step'), 10)];
+        if (s.kind === 'settings') openSettings();
+        else if (s.tab) showTab(s.tab, document.querySelectorAll('.tabnav button')[TAB_INDEX[s.tab]]);
+      });
+    });
+  }
+
+  // ---- report + export ----
+  function capWord(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+  function csvCell(v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function downloadFile(name, type, content) {
+    var blob = new Blob([content], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  }
+
+  async function printReport() {
+    try {
+      var r = await Promise.all([
+        fetch('/api/overview').then(function (x) { return x.json(); }),
+        fetch('/api/rollout').then(function (x) { return x.json(); })
+      ]);
+      var w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write(buildReportHtml(r[0], r[1]));
+      w.document.close(); w.focus();
+      setTimeout(function () { try { w.print(); } catch (e) { /* ignore */ } }, 300);
+    } catch (e) { /* ignore */ }
+  }
+
+  function buildReportHtml(ov, roll) {
+    var name = firmSettings.name || 'Your firm';
+    var date = new Date().toLocaleDateString();
+    var rows = (roll.tracker || []).map(function (t) {
+      return '<tr><td>' + esc(t.client.name) + '</td><td>' + (t.client.tier || '') + '</td><td>' + capWord(t.action) +
+        '</td><td class="r">' + (t.action === 'fire' ? '—' : money(t.proposed_fee)) + '</td><td>' + capWord(t.state || '') + '</td></tr>';
+    }).join('');
+    var A = ov.actions || {};
+    return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(name) + ' — summary</title>' +
+      '<style>body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1F3A3D;max-width:760px;margin:32px auto;padding:0 20px;}' +
+      'h1{font-size:22px;margin:0 0 4px;}.muted{color:#6B6B6B;font-size:13px;margin-bottom:8px;}' +
+      '.stats{display:flex;flex-wrap:wrap;gap:24px;margin:18px 0;border-top:2px solid #1F3A3D;border-bottom:1px solid #ddd;padding:14px 0;}' +
+      '.stat b{display:block;font-size:20px;}.stat span{font-size:12px;color:#6B6B6B;}' +
+      'table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px;}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #eee;}td.r,th.r{text-align:right;}' +
+      'th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;}@media print{body{margin:0;}}</style></head><body>' +
+      '<h1>' + esc(name) + '</h1><div class="muted">Client decisions summary · ' + date + '</div>' +
+      '<div class="stats">' +
+      '<div class="stat"><b>' + ov.clients + '</b><span>clients</span></div>' +
+      '<div class="stat"><b>' + ov.decided + '</b><span>decided</span></div>' +
+      '<div class="stat"><b>' + money(ov.committed) + '</b><span>committed revenue</span></div>' +
+      '<div class="stat"><b>' + money(ov.potential) + '</b><span>on the table</span></div>' +
+      '<div class="stat"><b>' + money(ov.bookRevenue) + '</b><span>current book</span></div></div>' +
+      '<p class="muted">Keep ' + (A.keep || 0) + ' · Raise ' + (A.raise || 0) + ' · Nudge ' + (A.nudge || 0) + ' · Let go ' + (A.fire || 0) + '</p>' +
+      '<table><thead><tr><th>Client</th><th>Tier</th><th>Decision</th><th class="r">Proposed fee</th><th>Response</th></tr></thead><tbody>' +
+      rows + '</tbody></table></body></html>';
+  }
+
+  async function exportCsv() {
+    try {
+      var r = await Promise.all([
+        fetch('/api/clients').then(function (x) { return x.json(); }),
+        fetch('/api/rollout').then(function (x) { return x.json(); })
+      ]);
+      var clients = r[0].clients || [];
+      var trackByClient = {};
+      (r[1].tracker || []).forEach(function (t) { trackByClient[t.client.id] = t; });
+      var rows = [['Client', 'Email', 'Tier', 'Entity', 'Return', 'Annual fee', 'Est hours', 'Realized rate', 'Decision', 'Proposed fee', 'Response']];
+      clients.forEach(function (c) {
+        var t = trackByClient[c.id];
+        rows.push([
+          c.name, c.email || '', c.tier || '', c.entity_type || '', c.return_type || '',
+          c.annual_fee != null ? c.annual_fee : '', c.est_hours != null ? c.est_hours : '',
+          c.realized_rate != null ? Math.round(c.realized_rate) : '',
+          t ? t.action : '', (t && t.action !== 'fire') ? t.proposed_fee : '', t ? (t.state || '') : ''
+        ]);
+      });
+      downloadFile('boundary-crm-book.csv', 'text/csv', rows.map(function (row) { return row.map(csvCell).join(','); }).join('\n'));
+    } catch (e) { /* ignore */ }
+  }
+
+  document.getElementById('reportBtn').addEventListener('click', printReport);
+  document.getElementById('exportBtn').addEventListener('click', exportCsv);
 
   // ---- client detail modal (edit / add / notes) ----
   var cm = { id: null };

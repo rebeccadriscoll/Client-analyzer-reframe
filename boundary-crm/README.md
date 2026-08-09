@@ -25,7 +25,9 @@ Phase 1 also adds a **Home dashboard** (overview + suggested next step), **edit/
 header, a minimum fee that floors raise suggestions + the Fear Killer, and a default batch
 size), **portfolio search / tier-filter / column sort**, and **Seasons** — closing a season
 snapshots the cycle's decisions and committed revenue, then clears them (clients and notes
-stay) so you start fresh next tax season.
+stay) so you start fresh next tax season. The Home tab also has a first-run
+**getting-started checklist**, a **printable summary report**, and a **CSV export** of the
+book.
 
 ## Fear Killer (Step 6)
 
