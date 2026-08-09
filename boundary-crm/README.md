@@ -60,12 +60,16 @@ the client name and, for raises, the old and new fee.
   `sanitizeVoice` net. The prompt stays server-side.
 - **Nothing auto-sends.** The tool drafts; you edit and send. Drafts **autosave** as you
   type (debounced), so nothing is lost on exit; Save is still there for an explicit save.
-- **Send** emails the message straight to the client (via Brevo) with their confirm link,
-  and marks them told — one client at a time, owner-initiated. Requires the client to have
-  an email (a mappable import field) and `BREVO_API_KEY` to be set.
+- **Send from my email** prepares the message + the client's confirm link, marks them
+  told, and opens it in the owner's own email app (pre-addressed if an email is on file),
+  so the message goes out from the owner's real account — no per-firm domain setup, and
+  replies come back to them. The confirm link still drives agreed/declined, so the Tracker
+  stays current. The app itself does not send client mail (Brevo is only for the owner's
+  sign-in link).
 
 Backed by `POST /api/words/generate` (`{ client_id }` → draft), `POST /api/words/save`
-(`{ client_id, message }`), and `POST /api/words/send` (`{ client_id }`), all firm-scoped.
+(`{ client_id, message }`), and `POST /api/words/handoff` (`{ client_id }` → link + mark
+told), all firm-scoped.
 
 ### Learn my voice (Claude)
 
@@ -139,7 +143,7 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/decisions` | POST | Save one decision (`{ client_id, action, new_fee? }`) |
 | `/api/words/generate` | POST | Draft a message for a decision (`{ client_id }`) |
 | `/api/words/save` | POST | Save the final message (`{ client_id, message }`) |
-| `/api/words/send` | POST | Email the message to the client + mark told (`{ client_id }`) |
+| `/api/words/handoff` | POST | Mint the confirm link + mark told, for the owner to send (`{ client_id }`) |
 | `/api/rollout` | GET | Waves, tracker rows, and committed/potential totals |
 | `/api/waves` | POST | Set a wave's send date + status (`{ type, send_date?, status }`) |
 | `/api/commitments` | POST | Owner sets a client's state (`{ client_id, state }`) |
