@@ -27,6 +27,7 @@ export async function getOrCreateFirm(env: Env, rawEmail: string): Promise<Firm>
     created_at: Date.now(),
     min_fee: null,
     batch_size: null,
+    target_rate: null,
   };
   await env.DB.prepare(
     "INSERT INTO firm (id, owner_email, name, created_at) VALUES (?, ?, ?, ?)"
@@ -40,13 +41,21 @@ export async function getOrCreateFirm(env: Env, rawEmail: string): Promise<Firm>
 export async function updateSettings(
   env: Env,
   firmId: string,
-  s: { name: string | null; min_fee: number | null; batch_size: number | null }
+  s: { name: string | null; min_fee: number | null; batch_size: number | null; target_rate: number | null }
 ): Promise<Firm> {
-  await env.DB.prepare("UPDATE firm SET name = ?, min_fee = ?, batch_size = ? WHERE id = ?")
-    .bind(s.name, s.min_fee, s.batch_size, firmId)
+  await env.DB.prepare("UPDATE firm SET name = ?, min_fee = ?, batch_size = ?, target_rate = ? WHERE id = ?")
+    .bind(s.name, s.min_fee, s.batch_size, s.target_rate, firmId)
     .run();
   const row = await env.DB.prepare("SELECT * FROM firm WHERE id = ?").bind(firmId).first<Firm>();
   return row!;
+}
+
+/** The firm's target realized rate, or null. Used to grade tiers absolutely. */
+export async function getTargetRate(env: Env, firmId: string): Promise<number | null> {
+  const row = await env.DB.prepare("SELECT target_rate FROM firm WHERE id = ?")
+    .bind(firmId)
+    .first<{ target_rate: number | null }>();
+  return row?.target_rate ?? null;
 }
 
 // ---- seasons ----
@@ -172,6 +181,13 @@ export interface NewClient {
   tier: Tier | null;
 }
 
+/** Clamp a risk/relationship input to 1..3, or null. */
+function level(v: number | null | undefined): number | null {
+  if (v == null) return null;
+  const n = Math.round(v);
+  return n >= 1 && n <= 3 ? n : null;
+}
+
 /** Insert a batch of clients for a firm and return the created rows. */
 export async function insertClients(env: Env, firmId: string, news: NewClient[]): Promise<Client[]> {
   const now = Date.now();
@@ -187,6 +203,8 @@ export async function insertClients(env: Env, firmId: string, news: NewClient[])
     realized_rate: c.realized_rate,
     tier: c.tier,
     flags: null,
+    risk_level: null,
+    relationship_level: null,
     created_at: now,
   }));
 
@@ -241,7 +259,8 @@ export async function loadSampleClients(env: Env, firmId: string): Promise<Clien
     realized_rate: realizedRate(c.annual_fee, c.est_hours),
     tier: null,
   }));
-  const tiers = computeTiers(staged, (c) => c.realized_rate);
+  const target = await getTargetRate(env, firmId);
+  const tiers = computeTiers(staged, (c) => c.realized_rate, target);
   const stmts = staged.map((c, i) =>
     env.DB.prepare(
       `INSERT INTO client (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, created_at)
@@ -291,12 +310,15 @@ export interface ClientFields {
   return_type: string | null;
   annual_fee: number | null;
   est_hours: number | null;
+  risk_level?: number | null;
+  relationship_level?: number | null;
 }
 
 /** Recompute A-D tiers across a firm's whole book (after any add/edit/delete). */
 export async function retierFirm(env: Env, firmId: string): Promise<void> {
   const clients = await listClients(env, firmId);
-  const tiers = computeTiers(clients, (c) => c.realized_rate);
+  const target = await getTargetRate(env, firmId);
+  const tiers = computeTiers(clients, (c) => c.realized_rate, target);
   const stmts = clients.map((c, i) =>
     env.DB.prepare("UPDATE client SET tier = ? WHERE id = ?").bind(tiers[i], c.id)
   );
@@ -317,14 +339,17 @@ export async function createClient(env: Env, firmId: string, f: ClientFields): P
     realized_rate: realizedRate(f.annual_fee, f.est_hours),
     tier: null,
     flags: null,
+    risk_level: level(f.risk_level),
+    relationship_level: level(f.relationship_level),
     created_at: Date.now(),
   };
   await env.DB.prepare(
-    `INSERT INTO client (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO client (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, risk_level, relationship_level, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(client.id, firmId, client.name, client.email, client.entity_type, client.return_type,
-      client.annual_fee, client.est_hours, client.realized_rate, client.tier, client.flags, client.created_at)
+      client.annual_fee, client.est_hours, client.realized_rate, client.tier, client.flags,
+      client.risk_level, client.relationship_level, client.created_at)
     .run();
   await retierFirm(env, firmId);
   return (await getClient(env, firmId, client.id))!;
@@ -336,10 +361,11 @@ export async function updateClient(env: Env, firmId: string, id: string, f: Clie
   if (!existing) return null;
   const rate = realizedRate(f.annual_fee, f.est_hours);
   await env.DB.prepare(
-    `UPDATE client SET name = ?, email = ?, entity_type = ?, return_type = ?, annual_fee = ?, est_hours = ?, realized_rate = ?
+    `UPDATE client SET name = ?, email = ?, entity_type = ?, return_type = ?, annual_fee = ?, est_hours = ?, realized_rate = ?, risk_level = ?, relationship_level = ?
      WHERE id = ? AND firm_id = ?`
   )
-    .bind(f.name, f.email, f.entity_type, f.return_type, f.annual_fee, f.est_hours, rate, id, firmId)
+    .bind(f.name, f.email, f.entity_type, f.return_type, f.annual_fee, f.est_hours, rate,
+      level(f.risk_level), level(f.relationship_level), id, firmId)
     .run();
   await retierFirm(env, firmId);
   return getClient(env, firmId, id);

@@ -126,9 +126,14 @@ function systemPrompt(firm: Firm): string {
     `owner re-price and re-shape their client book. You are helping the owner of ${firmName}. ` +
     `You work only with this firm's own clients, never anyone else's.\n\n` +
     `What the app does: every client is scored by realized rate (annual fee divided by estimated hours) and ` +
-    `sorted into tiers A through D. The owner decides an action for each client: keep (no change), raise ` +
-    `(higher fee), nudge (small changes to fix the fit), or fire (part ways). Then they send each client a ` +
-    `message and track who agreed, declined, or has gone silent.\n\n` +
+    `sorted into tiers A through D. When the firm has set a target rate, tiers grade against it, so D means ` +
+    `genuinely below target, not merely the bottom of this book. Clients can also carry a risk level and a ` +
+    `relationship level (each 1 low to 3 high): risk is what a client costs beyond the fee (late pay, messy ` +
+    `books, scope creep), relationship is their value beyond the fee (referrals, tenure, growth). A thin-rate ` +
+    `client who is low risk and a strong referral source can still be a keep. The owner decides an action for ` +
+    `each client: keep (no change), raise (higher fee), nudge (small changes to fix the fit), or fire (part ` +
+    `ways). Then they send each client a message and track who agreed, declined, or has gone silent. Because ` +
+    `capacity is the scarce resource, letting a client go hands back that client's hours.\n\n` +
     `Your job: answer the owner's questions about their book and, when they ask, do the work with them. You ` +
     `can record a decision for a client (keep, raise, nudge, fire), draft the client-facing message, record ` +
     `how a client responded, and jot notes. Use the tools to read real data before answering. Never invent ` +
@@ -298,6 +303,13 @@ async function runTool(
     const silent = commitments.filter(
       (c) => c.state === "told" && now - c.updated_at > 7 * 86400000
     ).length;
+    let freedHours = 0;
+    for (const d of decisions) {
+      if (d.action === "fire") {
+        const c = byId.get(d.client_id);
+        if (c && c.est_hours) freedHours += c.est_hours;
+      }
+    }
     return {
       clients: clients.length,
       tiers,
@@ -307,6 +319,9 @@ async function runTool(
       committed_revenue: committed,
       potential_revenue: potential,
       book_revenue: clients.reduce((s, c) => s + (c.annual_fee ?? 0), 0),
+      book_hours: clients.reduce((s, c) => s + (c.est_hours ?? 0), 0),
+      hours_freed_by_goodbyes: freedHours,
+      target_rate: firm.target_rate,
       silent,
     };
   }
@@ -331,6 +346,8 @@ async function runTool(
         tier: c.tier,
         annual_fee: c.annual_fee,
         realized_rate: c.realized_rate,
+        risk_level: c.risk_level,
+        relationship_level: c.relationship_level,
         action: d?.action ?? null,
         state: comm?.state ?? null,
       };
@@ -359,6 +376,8 @@ async function runTool(
           annual_fee: c.annual_fee,
           est_hours: c.est_hours,
           realized_rate: c.realized_rate,
+          risk_level: c.risk_level,
+          relationship_level: c.relationship_level,
           action: d?.action ?? null,
           new_fee: d?.new_fee ?? null,
           has_message: !!d?.drafted_message,

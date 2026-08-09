@@ -702,6 +702,10 @@
   .mfield label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray); margin-bottom: 5px; }
   .mfield input { width: 100%; padding: 11px 12px; font-size: 15px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; }
   .mfield input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .tier-note { font-size: 12px; color: var(--gray); margin-bottom: 12px; margin-top: -4px; }
+  .mfield select { width: 100%; padding: 11px 12px; font-size: 15px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; cursor: pointer; }
+  .mfield select:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .mfield label .lbl-hint { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray); margin-left: 4px; }
   .modal-meta { font-size: 13px; color: var(--gray); margin: 10px 0 4px; }
   .modal-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
   .modal-actions .spacer { flex: 1; }
@@ -994,12 +998,14 @@
           <div class="stat-grid">
             <div class="stat-tile"><div class="lbl">Clients</div><div class="val" id="stClients">0</div><div class="sub" id="stDecided">0 decided</div></div>
             <div class="stat-tile"><div class="lbl">Committed revenue</div><div class="val" id="stCommitted">$0</div><div class="sub" id="stPotential">of $0 on the table</div></div>
+            <div class="stat-tile"><div class="lbl">Hours freed</div><div class="val" id="stHours">0</div><div class="sub" id="stHoursSub">from goodbyes</div></div>
             <div class="stat-tile"><div class="lbl">Book revenue</div><div class="val" id="stBook">$0</div><div class="sub">current annual fees</div></div>
             <div class="stat-tile"><div class="lbl">Needs follow-up</div><div class="val" id="stSilent">0</div><div class="sub">silent 7+ days</div></div>
           </div>
           <div class="home-cols">
             <div class="home-card">
               <h4>Tier mix</h4>
+              <div class="tier-note" id="homeTierNote"></div>
               <div id="homeTiers"></div>
             </div>
             <div class="home-card">
@@ -1331,6 +1337,10 @@
         <div class="mfield"><label>Return type</label><input id="cmReturn" type="text" placeholder="1120-S, 1040…" /></div>
         <div class="mfield"><label>Annual fee</label><input id="cmFee" type="text" inputmode="numeric" placeholder="0" /></div>
         <div class="mfield"><label>Estimated hours</label><input id="cmHours" type="text" inputmode="numeric" placeholder="0" /></div>
+        <div class="mfield"><label>Risk / pain <span class="lbl-hint">cost beyond the fee</span></label>
+          <select id="cmRisk"><option value="">Not set</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option></select></div>
+        <div class="mfield"><label>Relationship <span class="lbl-hint">value beyond the fee</span></label>
+          <select id="cmRel"><option value="">Not set</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option></select></div>
       </div>
       <div class="modal-meta" id="cmMeta"></div>
       <div class="modal-actions">
@@ -1359,10 +1369,11 @@
       </div>
       <div class="field-grid">
         <div class="mfield full"><label>Firm name</label><input id="setName" type="text" placeholder="Your firm name" /></div>
+        <div class="mfield"><label>Target realized rate ($/hr)</label><input id="setTarget" type="text" inputmode="numeric" placeholder="e.g. 200" /></div>
         <div class="mfield"><label>Minimum fee</label><input id="setMinFee" type="text" inputmode="numeric" placeholder="0" /></div>
         <div class="mfield"><label>Default batch size</label><input id="setBatch" type="text" inputmode="numeric" placeholder="5" /></div>
       </div>
-      <div class="modal-meta">The minimum fee floors your raise suggestions and the Fear Killer. Batch size sets how many clients you work at a time.</div>
+      <div class="modal-meta">Your target realized rate is what an hour of your work should earn. Set it and tiers grade against it, so D means genuinely below target, not just the bottom of your book. The minimum fee floors your raise suggestions and the Fear Killer. Batch size sets how many clients you work at a time.</div>
       <div class="modal-actions">
         <span class="spacer"></span>
         <button class="btn btn-ghost" id="setCancel">Cancel</button>
@@ -1485,13 +1496,14 @@
     });
   };
 
-  var firmSettings = { name: null, min_fee: null, batch_size: null };
+  var firmSettings = { name: null, min_fee: null, batch_size: null, target_rate: null };
 
   function applySettings(firm) {
     if (!firm) return;
     firmSettings.name = firm.name;
     firmSettings.min_fee = firm.min_fee;
     firmSettings.batch_size = firm.batch_size;
+    firmSettings.target_rate = firm.target_rate;
     document.getElementById('brandTag').textContent = firm.name || 'Your firm';
     if (firm.batch_size) {
       var sel = document.getElementById('batchSize');
@@ -1933,11 +1945,15 @@
 
   function clientFlags(c) {
     var f = [];
-    if (c.realized_rate == null) { f.push('No fee or hours on file yet'); return f; }
-    if (c.tier === 'A') f.push('Top tier by realized rate — worth protecting');
-    if (c.tier === 'D') f.push('Bottom tier by realized rate');
-    if (dec.avgRate > 0 && c.realized_rate < dec.avgRate) f.push('Below your book average of $' + Math.round(dec.avgRate) + '/hr');
-    else if (dec.avgRate > 0) f.push('At or above your book average');
+    if (c.realized_rate == null) f.push('No fee or hours on file yet');
+    else {
+      if (c.tier === 'A') f.push('Top tier by realized rate — worth protecting');
+      if (c.tier === 'D') f.push(firmSettings.target_rate ? 'Below your $' + Math.round(firmSettings.target_rate) + '/hr target' : 'Bottom tier by realized rate');
+      if (dec.avgRate > 0 && c.realized_rate < dec.avgRate) f.push('Below your book average of $' + Math.round(dec.avgRate) + '/hr');
+      else if (dec.avgRate > 0) f.push('At or above your book average');
+    }
+    if ((c.risk_level || 0) >= 3) f.push('High risk or pain beyond the fee');
+    if ((c.relationship_level || 0) >= 3) f.push('High-value relationship (referrals, tenure, growth)');
     return f;
   }
 
@@ -1954,18 +1970,28 @@
   function suggestAction(c, feel) {
     var t = c.tier;
     var base = (t === 'A' || t === 'B') ? 'keep' : (t === 'C') ? 'raise' : (t === 'D') ? 'raise' : 'keep';
-    if (feel === 'Dread') return (t === 'A' || t === 'B') ? 'raise' : 'fire';
-    if (feel === 'Drained') return base === 'keep' ? 'nudge' : base;
-    if (feel === 'Glad') return 'keep';
+    if (feel === 'Dread') base = (t === 'A' || t === 'B') ? 'raise' : 'fire';
+    else if (feel === 'Drained') base = base === 'keep' ? 'nudge' : base;
+    else if (feel === 'Glad') base = 'keep';
+    // Multi-factor: risk and relationship bend the call beyond the rate alone.
+    var risk = c.risk_level || 0, rel = c.relationship_level || 0;
+    if (rel >= 3 && base === 'fire') base = 'nudge';                 // a valued relationship is worth trying to save
+    if (risk >= 3 && base === 'keep') base = 'nudge';                // high pain: set boundaries even on a keeper
+    if (risk >= 3 && t === 'D' && rel < 3 && base === 'raise') base = 'fire'; // thin, painful, not valued
     return base;
   }
 
   function suggestReason(c, feel, action) {
-    if (action === 'keep') return 'Strong economics' + (feel === 'Glad' ? ' and you like the work.' : '.');
-    if (action === 'raise') return (c.tier === 'C' || c.tier === 'D') ? 'The rate is thin for the hours.' : 'Room to price this closer to your better clients.';
-    if (action === 'fire') return 'Low rate and it wears on you. The book has room for better.';
-    if (action === 'nudge') return 'Worth keeping if the fit improves.';
-    return '';
+    var risk = c.risk_level || 0, rel = c.relationship_level || 0;
+    var base;
+    if (action === 'keep') base = 'Strong economics' + (feel === 'Glad' ? ' and you like the work.' : '.');
+    else if (action === 'raise') base = (c.tier === 'C' || c.tier === 'D') ? 'The rate is thin for the hours.' : 'Room to price this closer to your better clients.';
+    else if (action === 'fire') base = 'Low rate and it wears on you. The book has room for better.';
+    else if (action === 'nudge') base = 'Worth keeping if the fit improves.';
+    else base = '';
+    if (rel >= 3 && action !== 'fire') base += ' A valued relationship, so protect it.';
+    else if (risk >= 3) base += ' They cost you beyond the fee, so tighten the terms.';
+    return base;
   }
 
   function suggestFee(c, avg) {
@@ -2749,6 +2775,16 @@
     document.getElementById('stPotential').textContent = 'of ' + money(d.potential) + ' on the table';
     document.getElementById('stBook').textContent = money(d.bookRevenue);
     document.getElementById('stSilent').textContent = d.silent;
+    var freed = Math.round(d.freedHours || 0);
+    document.getElementById('stHours').textContent = freed ? freed : '0';
+    document.getElementById('stHoursSub').textContent = freed
+      ? 'back from ' + (d.actions.fire || 0) + ' goodbye' + ((d.actions.fire || 0) === 1 ? '' : 's')
+      : 'from goodbyes';
+
+    var note = document.getElementById('homeTierNote');
+    if (note) note.textContent = firmSettings.target_rate
+      ? 'Graded against your $' + Math.round(firmSettings.target_rate) + '/hr target'
+      : 'Ranked within your book. Set a target rate in Settings to grade absolutely.';
 
     var tc = { A: 'var(--tier-a)', B: 'var(--tier-b)', C: 'var(--tier-c)', D: 'var(--tier-d)' };
     var ht = ['A', 'B', 'C', 'D'].map(function (t) { return tierBar(t, d.tiers[t] || 0, d.clients, tc[t], '18px'); }).join('');
@@ -2988,6 +3024,8 @@
     document.getElementById('cmReturn').value = client && client.return_type ? client.return_type : '';
     document.getElementById('cmFee').value = client && client.annual_fee != null ? client.annual_fee : '';
     document.getElementById('cmHours').value = client && client.est_hours != null ? client.est_hours : '';
+    document.getElementById('cmRisk').value = client && client.risk_level != null ? String(client.risk_level) : '';
+    document.getElementById('cmRel').value = client && client.relationship_level != null ? String(client.relationship_level) : '';
     var meta = document.getElementById('cmMeta');
     meta.textContent = client
       ? ('Tier ' + (client.tier || '—') + ' · realized rate ' + (client.realized_rate != null ? '$' + Math.round(client.realized_rate) + '/hr' : '—'))
@@ -3018,7 +3056,9 @@
       entity_type: document.getElementById('cmEntity').value,
       return_type: document.getElementById('cmReturn').value,
       annual_fee: document.getElementById('cmFee').value,
-      est_hours: document.getElementById('cmHours').value
+      est_hours: document.getElementById('cmHours').value,
+      risk_level: document.getElementById('cmRisk').value || null,
+      relationship_level: document.getElementById('cmRel').value || null
     };
     if (!payload.name.trim()) { document.getElementById('cmName').focus(); return; }
     var btn = document.getElementById('cmSave'); btn.disabled = true; btn.textContent = 'Saving…';
@@ -3099,6 +3139,7 @@
 
   function openSettings() {
     document.getElementById('setName').value = firmSettings.name || '';
+    document.getElementById('setTarget').value = firmSettings.target_rate != null ? firmSettings.target_rate : '';
     document.getElementById('setMinFee').value = firmSettings.min_fee != null ? firmSettings.min_fee : '';
     document.getElementById('setBatch').value = firmSettings.batch_size != null ? firmSettings.batch_size : '';
     document.getElementById('seasonLabel').value = '';
@@ -3111,13 +3152,19 @@
   async function saveSettings() {
     var payload = {
       name: document.getElementById('setName').value,
+      target_rate: document.getElementById('setTarget').value,
       min_fee: document.getElementById('setMinFee').value,
       batch_size: document.getElementById('setBatch').value
     };
     var btn = document.getElementById('setSave'); btn.disabled = true; btn.textContent = 'Saving…';
     try {
       var res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (res.ok) { applySettings((await res.json()).firm); closeSettings(); }
+      if (res.ok) {
+        applySettings((await res.json()).firm);
+        closeSettings();
+        loadClients(); loadOverview();
+        if (typeof loadDecide === 'function') loadDecide();
+      }
     } catch (e) { /* ignore */ }
     btn.disabled = false; btn.textContent = 'Save';
   }

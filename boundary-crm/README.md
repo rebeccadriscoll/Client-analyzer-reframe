@@ -189,9 +189,29 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
   is present, an optional single LLM call refines only the low-confidence guesses; any
   failure falls back to the heuristic, so import never depends on the model.
 - **Realized rate** = `annual_fee / est_hours` (null when hours are missing/zero).
-- **Tier** is assigned by realized-rate percentile within the imported set: A = top 20%,
-  B = next 30%, C = next 30%, D = bottom 20%. Rows with no name are skipped; rows with no
-  fee/hours import but stay unranked.
+- **Tier** grades realized rate. With a **target rate** set (Settings), grading is
+  absolute: A >= 1.25x target, B >= target, C >= 0.6x target, else D, so a book of all
+  strong clients can be all A/B and "D" means genuinely below what the work should earn.
+  Without a target it falls back to percentile within the book (A top 20%, B 30%, C 30%,
+  D bottom 20%). Rows with no name are skipped; rows with no fee/hours import but stay
+  unranked. Setting or changing the target re-tiers the whole book.
+
+## Decision factors and capacity
+
+Realized rate is not the whole story, so a client also carries two optional 1 (low) to 3
+(high) levels, set on the client card:
+
+- **Risk / pain** — what a client costs beyond the fee (late pay, messy books, scope creep).
+- **Relationship** — their value beyond the fee (referrals, tenure, growth).
+
+These bend the suggested call in Decide: a high-value relationship pulls a would-be goodbye
+back to a nudge; high pain turns a keep into a nudge (set boundaries) and can turn a thin,
+unvalued client into a goodbye. The reasoning line names the factor, so the call stays
+explainable.
+
+Because capacity, not demand, is the binding constraint in most firms right now, the Home
+dashboard leads with **Hours freed** (the hours handed back by the goodbyes) alongside the
+revenue figures, and the assistant can speak in those terms too.
 - **Adapter seam:** the importer is an `Importer` interface (`src/import/importer.ts`).
   Phase 0 ships only `SpreadsheetImporter`; QBO/TaxDome connectors implement the same
   interface later without touching mapping, tiering, or the write path.
@@ -223,7 +243,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/words/save` | POST | Save the final message (`{ client_id, message }`) |
 | `/api/words/handoff` | POST | Mint the confirm link + mark told, for the owner to send (`{ client_id }`) |
 | `/api/overview` | GET | Dashboard aggregates + suggested next step |
-| `/api/settings` | GET/POST | Firm name, minimum fee, default batch size |
+| `/api/settings` | GET/POST | Firm name, target rate, minimum fee, default batch size |
 | `/api/seasons` | GET | Past closed seasons |
 | `/api/seasons/close` | POST | Snapshot the cycle + clear it (`{ label }`) |
 | `/api/clients/create` | POST | Add a client by hand (re-tiers the book) |
@@ -314,7 +334,7 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth … 0007 note; 0008 settings + season)
+  migrations/           D1 schema (0001 auth … 0008 settings + season; 0009 target rate + risk/relationship)
   src/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)
