@@ -450,6 +450,7 @@ async function handleOverview(request: Request, env: Env): Promise<Response> {
     potential,
     silent,
     bookRevenue,
+    contacted: commitments.length,
     next,
   });
 }
