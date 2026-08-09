@@ -10,6 +10,9 @@ import {
   insertClients,
   listClients,
   deleteClientsForFirm,
+  firmHasClients,
+  loadSampleClients,
+  clearSampleClients,
   clientBelongsToFirm,
   createClient,
   updateClient,
@@ -148,6 +151,12 @@ export default {
       }
       if (pathname === "/api/assistant" && request.method === "POST") {
         return await handleAssistant(request, env);
+      }
+      if (pathname === "/api/sample/load" && request.method === "POST") {
+        return await handleSampleLoad(request, env);
+      }
+      if (pathname === "/api/sample/clear" && request.method === "POST") {
+        return await handleSampleClear(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -561,6 +570,24 @@ async function handleImportCommit(request: Request, env: Env): Promise<Response>
     clients: all,
     count: all.length,
   });
+}
+
+/** POST /api/sample/load — fill an empty book with demo clients to explore. */
+async function handleSampleLoad(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  if (await firmHasClients(env, firm.id)) return json({ error: "not_empty" }, 409);
+  const clients = await loadSampleClients(env, firm.id);
+  return json({ ok: true, clients, tiers: tierCounts(clients), count: clients.length });
+}
+
+/** POST /api/sample/clear — remove just the demo clients. */
+async function handleSampleClear(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  await clearSampleClients(env, firm.id);
+  const clients = await listClients(env, firm.id);
+  return json({ ok: true, clients, tiers: tierCounts(clients), count: clients.length });
 }
 
 const ACTIONS: Action[] = ["keep", "raise", "fire", "nudge"];

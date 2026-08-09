@@ -831,6 +831,26 @@
   }
   .flash.show { transform: translate(-50%, 0); opacity: 1; }
   .flash .fdot { font-size: 15px; }
+
+  /* ===== SAMPLE DATA ===== */
+  .sample-banner {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #FFF6DC; border: 1px dashed var(--yellow); border-radius: 14px;
+    padding: 12px 16px; margin-bottom: 24px;
+  }
+  .sample-banner .sb-tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    color: #9A7B12; background: rgba(245, 208, 97, 0.35); padding: 4px 10px; border-radius: 100px; flex: 0 0 auto;
+  }
+  .sample-banner .sb-text { font-size: 14px; color: var(--navy); flex: 1 1 220px; }
+  .sample-banner .sb-clear { flex: 0 0 auto; }
+  .empty-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  .or-sample { margin-top: 16px; font-size: 14px; color: var(--gray); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .link-inline {
+    background: none; border: none; padding: 0; font-family: 'Inter'; font-size: 14px; font-weight: 600;
+    color: var(--coral-deep); cursor: pointer; text-decoration: underline;
+  }
+  .link-inline:hover { color: var(--coral); }
 </style>
 </head>
 <body>
@@ -917,6 +937,12 @@
         <button onclick="showTab('fear', this)"><span class="num">⑥</span> Fear Killer</button>
       </nav>
 
+      <div class="sample-banner" id="sampleBanner" style="display:none;">
+        <span class="sb-tag">Sample data</span>
+        <span class="sb-text">You are exploring with a demo book. Clear it whenever you are ready to add your own clients.</span>
+        <button class="btn btn-ghost sb-clear" id="sampleClearBtn" type="button">Clear sample data</button>
+      </div>
+
       <!-- 0. HOME -->
       <div class="panel active" id="panel-home">
         <div class="section-header">
@@ -930,7 +956,10 @@
           <div class="icon">👋</div>
           <h3>Welcome. Let's bring your clients in.</h3>
           <p>Import your client list and the dashboard fills in: tiers, decisions, committed revenue, and your next step.</p>
-          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('import', document.querySelectorAll('.tabnav button')[1])">Go to import</button>
+          <div class="empty-actions">
+            <button class="btn btn-primary" onclick="showTab('import', document.querySelectorAll('.tabnav button')[1])">Go to import</button>
+            <button class="btn btn-secondary" id="homeSampleBtn">Explore with sample clients</button>
+          </div>
         </div>
         <div id="homeMain" style="display:none;">
           <div class="checklist-card" id="homeChecklist" style="display:none;">
@@ -1031,6 +1060,10 @@
             <div class="dz-sub">or tap to choose a .csv file</div>
           </label>
           <p class="dz-help">Export a CSV from your practice software or spreadsheet. We map the columns for you in the next step. Nothing is saved until you confirm.</p>
+          <div class="or-sample">
+            <span>Not ready to upload?</span>
+            <button class="link-inline" id="importSampleBtn" type="button">Explore with sample clients</button>
+          </div>
         </div>
 
         <!-- Mapping + preview -->
@@ -1569,7 +1602,39 @@
       if (!res.ok) return;
       var data = await res.json();
       renderPortfolio(data.clients || [], countTiers(data.clients || []));
+      updateSampleBanner(data.clients || []);
     } catch (e) { /* stay on upload */ }
+  }
+
+  function updateSampleBanner(clients) {
+    var has = (clients || []).some(function (c) { return c.flags === 'sample'; });
+    document.getElementById('sampleBanner').style.display = has ? 'flex' : 'none';
+  }
+
+  async function loadSample() {
+    try {
+      var res = await fetch('/api/sample/load', { method: 'POST' });
+      var data = await res.json();
+      if (!res.ok) {
+        if (data && data.error === 'not_empty') flash('You already have clients. Clear them before loading the sample book.');
+        else flash('Could not load the sample clients. Please try again.');
+        return;
+      }
+      await Promise.all([loadClients(), loadOverview()]);
+      showTab('home', document.querySelectorAll('.tabnav button')[0]);
+    } catch (e) { flash('Could not load the sample clients. Please try again.'); }
+  }
+
+  async function clearSample() {
+    if (!window.confirm('Clear the sample clients? This removes the demo book so you can add your own. Your own clients and notes stay.')) return;
+    try {
+      var res = await fetch('/api/sample/clear', { method: 'POST' });
+      if (!res.ok) return;
+      await Promise.all([loadClients(), loadOverview()]);
+      if (typeof loadDecide === 'function') loadDecide();
+      if (typeof loadWords === 'function') loadWords();
+      if (typeof loadRollout === 'function') loadRollout();
+    } catch (e) { /* wrapper flashes on failure */ }
   }
 
   var pfState = { search: '', tier: 'all', sortKey: 'tier', sortDir: 1 };
@@ -3062,6 +3127,10 @@
     t.style.height = 'auto';
     t.style.height = Math.min(t.scrollHeight, 120) + 'px';
   }
+
+  document.getElementById('homeSampleBtn').addEventListener('click', loadSample);
+  document.getElementById('importSampleBtn').addEventListener('click', loadSample);
+  document.getElementById('sampleClearBtn').addEventListener('click', clearSample);
 
   document.getElementById('askFab').addEventListener('click', openAsk);
   document.getElementById('askClose').addEventListener('click', closeAsk);
