@@ -58,6 +58,31 @@ total sums the fees of everyone who has agreed, against the full amount on the t
 - **Nothing auto-sends.** The link is generated for you to send; the tool never contacts a
   client on its own.
 
+### Handoff packets (goodbyes)
+
+A client you let go is mismatched inventory, not garbage, so the Goodbyes wave offers
+**Handoff packets**: a clean, professional transition summary for each fired client, so
+nobody is left adrift. `GET /api/handoffs` builds one per fire decision, with the facts a
+receiving firm needs (business type, returns, current fee) and a warm, voice-compliant
+narrative. Each is editable in place, then **Copy** or **Print** (with **Print all** for
+the batch). Deliberately conservative: the packet carries only those facts, never the
+firm's private notes, and the modal reminds the owner to share with the client's knowledge
+and to disclose any referral arrangement per their board's rules (AICPA permits referral
+fees for non-attest clients with disclosure; they are restricted for attest clients and
+vary by state). A matching-and-referral network is a possible later step; this ships the
+single-firm packet that needs no network.
+
+### Decisions export for billing
+
+Firms bill through Anchor, Ignition, TaxDome, Canopy, Karbon, or QuickBooks, so a decision
+has to reach the billing system to be real. **Export decisions for billing (CSV)** (on the
+Home dashboard) writes one row per decided client: current fee, new fee, the change,
+committed fee, response, and a paste-ready billing note (a raise reads "Fee updated to
+$9,000 from $5,200 for the coming year. Scope unchanged."; a goodbye reads "Offboarding. Do
+not renew; stop recurring billing."). It works with every platform on day one because it
+needs no API. A deep two-way integration with one proposal tool is the natural next step,
+but the export is the universal bridge.
+
 ## The Words (Step 4)
 
 Every decision gets a draft you can edit, copy, and save. Drafts are personalized with
@@ -211,6 +236,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/commitments` | POST | Owner sets a client's state (`{ client_id, state }`) |
 | `/api/sample/load` | POST | Fill an empty book with demo clients to explore |
 | `/api/sample/clear` | POST | Remove just the demo clients |
+| `/api/handoffs` | GET | Transition packets for every client being let go |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
@@ -297,6 +323,7 @@ boundary-crm/
     scoring.ts          realized rate, A-D tiering, numeric parsing
     words.ts            message templates + voice guardrail + optional LLM
     assistant.ts        in-app Claude assistant: firm-scoped tool-use loop
+    handoff.ts          transition-packet builder for goodbyes
     rollout.ts          wave order/labels + proposed-fee logic
     commit_page.ts      public commitment confirm page (HTML)
     import/

@@ -830,6 +830,7 @@
     opacity: 0; transition: transform .28s ease, opacity .28s ease; pointer-events: none;
   }
   .flash.show { transform: translate(-50%, 0); opacity: 1; }
+  .flash.ok { background: var(--teal); }
   .flash .fdot { font-size: 15px; }
 
   /* ===== SAMPLE DATA ===== */
@@ -851,13 +852,29 @@
     color: var(--coral-deep); cursor: pointer; text-decoration: underline;
   }
   .link-inline:hover { color: var(--coral); }
+
+  /* ===== HANDOFF PACKETS ===== */
+  .btn-sm { padding: 8px 16px; font-size: 13px; }
+  .wave-extra { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--gray-light); }
+  .wave-extra-note { font-size: 13px; color: var(--gray); }
+  .modal-card.modal-wide { max-width: 680px; }
+  .ho-item { background: white; border: 1px solid var(--gray-light); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+  .ho-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+  .ho-facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; }
+  .ho-fact { font-size: 13px; color: var(--navy); }
+  .ho-fact b { color: var(--gray); font-weight: 600; }
+  .ho-note-lbl { font-size: 12px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; display: block; }
+  .ho-text { width: 100%; min-height: 120px; resize: vertical; border: 1px solid var(--gray-light); border-radius: 10px; padding: 11px 13px; font-family: 'Inter'; font-size: 14px; line-height: 1.5; color: var(--ink); background: var(--cream); }
+  .ho-text:focus { outline: none; border-color: var(--coral); }
+  .ho-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .ho-empty { font-size: 14px; color: var(--gray); font-style: italic; padding: 8px 0 16px; }
 </style>
 </head>
 <body>
   <div class="shape shape-1"></div>
   <div class="shape shape-2"></div>
 
-  <div class="flash" id="flash"><span class="fdot">!</span><span id="flashText"></span></div>
+  <div class="flash" id="flash"><span class="fdot" id="flashDot">!</span><span id="flashText"></span></div>
 
   <!-- ============ LOGIN GATE / FRONT DOOR ============ -->
   <div class="gate" id="gate">
@@ -993,6 +1010,7 @@
           <div class="home-actions">
             <button class="btn btn-secondary" id="reportBtn">Print a summary</button>
             <button class="btn btn-secondary" id="exportBtn">Export book (CSV)</button>
+            <button class="btn btn-secondary" id="exportDecBtn">Export decisions for billing (CSV)</button>
           </div>
         </div>
       </div>
@@ -1363,6 +1381,23 @@
     </div>
   </div>
 
+  <!-- ============ HANDOFF MODAL ============ -->
+  <div class="modal-overlay" id="handoffModal">
+    <div class="modal-card modal-wide">
+      <div class="modal-top">
+        <div class="modal-title">Handoff packets</div>
+        <button class="modal-close" id="hoClose" aria-label="Close">&times;</button>
+      </div>
+      <p class="modal-meta">A clean transition summary for each client you are letting go, so nobody is left adrift. Edit, copy, or print each one. These carry only the facts a new firm needs, never your private notes. Share with the client's knowledge, and if any referral arrangement is involved, disclose it per your board's rules.</p>
+      <div id="handoffList"></div>
+      <div class="modal-actions">
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" id="hoCancel">Close</button>
+        <button class="btn btn-primary" id="hoPrintAll">Print all</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ASK ASSISTANT -->
   <button class="ask-fab hidden" id="askFab" aria-label="Ask the assistant">
     <span class="spark">✦</span> Ask
@@ -1406,13 +1441,17 @@
 
   // ---- global API error + session handling ----
   var flashTimer = null;
-  function flash(msg) {
+  function flashShow(msg, ok) {
     var el = document.getElementById('flash');
     document.getElementById('flashText').textContent = msg;
+    el.classList.toggle('ok', !!ok);
+    document.getElementById('flashDot').textContent = ok ? '✓' : '!';
     el.classList.add('show');
     if (flashTimer) clearTimeout(flashTimer);
-    flashTimer = setTimeout(function () { el.classList.remove('show'); }, 6000);
+    flashTimer = setTimeout(function () { el.classList.remove('show'); }, ok ? 3500 : 6000);
   }
+  function flash(msg) { flashShow(msg, false); }
+  function flashOk(msg) { flashShow(msg, true); }
   var sessionDead = false;
   function handleSessionExpired() {
     if (sessionDead) return;
@@ -2465,8 +2504,14 @@
           return '<option value="' + s + '"' + (w.status === s ? ' selected' : '') + '>' + cap(s) + '</option>';
         }).join('') + '</select>' +
         '<span class="wave-status-tag ' + w.status + '">' + w.status + '</span>' +
-      '</div>';
+      '</div>' +
+      (w.type === 'fire'
+        ? '<div class="wave-extra"><button class="btn btn-secondary btn-sm wave-handoff" type="button">Handoff packets</button>' +
+          '<span class="wave-extra-note">A clean transition summary for each client you are letting go.</span></div>'
+        : '');
     var dateEl = card.querySelector('.wave-date');
+    var handoffBtn = card.querySelector('.wave-handoff');
+    if (handoffBtn) handoffBtn.addEventListener('click', openHandoffs);
     var selEl = card.querySelector('.wave-statsel');
     var tag = card.querySelector('.wave-status-tag');
     function saveWave() {
@@ -2818,8 +2863,118 @@
     } catch (e) { /* ignore */ }
   }
 
+  // Billing-oriented export: one row per decided client, current fee -> new fee,
+  // the change, and a paste-ready proposal note. Built for Anchor, Ignition,
+  // TaxDome, Canopy, Karbon, QuickBooks and the like.
+  function proposalNote(action, cur, next) {
+    if (action === 'raise') return 'Fee updated to ' + money(next) + (cur != null ? ' from ' + money(cur) : '') + ' for the coming year. Scope unchanged.';
+    if (action === 'keep') return 'Fee held at ' + money(next) + ' for the coming year.';
+    if (action === 'nudge') return 'Continuing at ' + money(next) + ' with small scope adjustments agreed for the coming year.';
+    if (action === 'fire') return 'Offboarding. Do not renew; stop recurring billing.';
+    return '';
+  }
+  async function exportDecisions() {
+    try {
+      var r = await Promise.all([
+        fetch('/api/clients').then(function (x) { return x.json(); }),
+        fetch('/api/rollout').then(function (x) { return x.json(); })
+      ]);
+      var byId = {};
+      (r[0].clients || []).forEach(function (c) { byId[c.id] = c; });
+      var tracker = (r[1].tracker || []);
+      if (!tracker.length) { flash('No decisions to export yet. Make some calls first.'); return; }
+      var rows = [['Client', 'Email', 'Entity', 'Return', 'Decision', 'Current fee', 'New fee', 'Change', 'Committed fee', 'Response', 'Billing note']];
+      tracker.forEach(function (t) {
+        var c = byId[t.client.id] || {};
+        var cur = c.annual_fee;
+        var next = t.action === 'fire' ? 0 : t.proposed_fee;
+        var change = (cur != null && next != null) ? (next - cur) : '';
+        rows.push([
+          t.client.name, c.email || '', c.entity_type || '', c.return_type || '',
+          cap(t.action || ''), cur != null ? cur : '', t.action === 'fire' ? 0 : next,
+          change, t.committed_fee != null ? t.committed_fee : '',
+          cap(t.state || ''), proposalNote(t.action, cur, next)
+        ]);
+      });
+      downloadFile('boundary-crm-decisions.csv', 'text/csv', rows.map(function (row) { return row.map(csvCell).join(','); }).join('\n'));
+    } catch (e) { flash('Could not build the export. Please try again.'); }
+  }
+
+  // ---- handoff packets (goodbyes) ----
+  var handoffState = { packets: [] };
+  async function openHandoffs() {
+    try {
+      var res = await fetch('/api/handoffs');
+      if (!res.ok) return;
+      var data = await res.json();
+      handoffState.packets = data.packets || [];
+      renderHandoffs();
+      var ov = document.getElementById('handoffModal');
+      ov.classList.add('show'); document.body.style.overflow = 'hidden';
+    } catch (e) { flash('Could not load the handoff packets. Please try again.'); }
+  }
+  function closeHandoffs() { document.getElementById('handoffModal').classList.remove('show'); document.body.style.overflow = ''; }
+  function renderHandoffs() {
+    var el = document.getElementById('handoffList');
+    var ps = handoffState.packets;
+    document.getElementById('hoPrintAll').style.display = ps.length ? '' : 'none';
+    if (!ps.length) {
+      el.innerHTML = '<div class="ho-empty">No goodbyes yet. Clients you decide to let go show up here with a ready-to-share summary.</div>';
+      return;
+    }
+    el.innerHTML = ps.map(function (p, i) {
+      var facts = (p.facts || []).map(function (f) { return '<span class="ho-fact"><b>' + esc(f.label) + ':</b> ' + esc(f.value) + '</span>'; }).join('');
+      return '<div class="ho-item" data-i="' + i + '">' +
+        '<div class="ho-name">' + esc(p.client_name) + '</div>' +
+        '<div class="ho-facts">' + facts + '</div>' +
+        '<span class="ho-note-lbl">Transition summary</span>' +
+        '<textarea class="ho-text" data-i="' + i + '">' + esc(p.narrative) + '</textarea>' +
+        '<div class="ho-actions"><button class="btn btn-secondary btn-sm ho-copy" data-i="' + i + '">Copy</button>' +
+        '<button class="btn btn-secondary btn-sm ho-print" data-i="' + i + '">Print</button></div>' +
+        '</div>';
+    }).join('');
+    el.querySelectorAll('.ho-copy').forEach(function (b) { b.addEventListener('click', function () { copyHandoff(+b.getAttribute('data-i')); }); });
+    el.querySelectorAll('.ho-print').forEach(function (b) { b.addEventListener('click', function () { printHandoffs([+b.getAttribute('data-i')]); }); });
+  }
+  function editedNarrative(i) {
+    var ta = document.querySelector('.ho-text[data-i="' + i + '"]');
+    return ta ? ta.value : handoffState.packets[i].narrative;
+  }
+  function packetText(i) {
+    var p = handoffState.packets[i];
+    var facts = (p.facts || []).map(function (f) { return '- ' + f.label + ': ' + f.value; }).join('\n');
+    return 'Client transition summary\nPrepared by ' + p.firm_name + '\n\nClient: ' + p.client_name + '\n' + facts + '\n\n' + editedNarrative(i) + '\n\n' + p.firm_name;
+  }
+  function copyHandoff(i) {
+    var text = packetText(i);
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(function () { flashOk('Copied ' + handoffState.packets[i].client_name + "'s summary."); }, function () {}); }
+  }
+  function printHandoffs(indexes) {
+    var w = window.open('', '_blank');
+    if (!w) return;
+    var pages = indexes.map(function (i) {
+      var p = handoffState.packets[i];
+      var facts = (p.facts || []).map(function (f) { return '<tr><td class="l">' + esc(f.label) + '</td><td>' + esc(f.value) + '</td></tr>'; }).join('');
+      return '<section><h1>Client transition summary</h1><div class="muted">Prepared by ' + esc(p.firm_name) + '</div>' +
+        '<h2>' + esc(p.client_name) + '</h2><table>' + facts + '</table>' +
+        '<p>' + esc(editedNarrative(i)).replace(/\n/g, '<br>') + '</p><div class="sign">' + esc(p.firm_name) + '</div></section>';
+    }).join('');
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Handoff packets</title>' +
+      '<style>body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1F3A3D;max-width:680px;margin:32px auto;padding:0 22px;}' +
+      'section{page-break-after:always;padding-bottom:24px;}h1{font-size:20px;margin:0 0 2px;}h2{font-size:16px;margin:18px 0 8px;}' +
+      '.muted{color:#6B6B6B;font-size:13px;}table{border-collapse:collapse;margin:6px 0 14px;font-size:14px;}td{padding:4px 10px 4px 0;}td.l{color:#6B6B6B;}' +
+      'p{font-size:14px;line-height:1.6;}.sign{margin-top:18px;font-size:14px;}@media print{body{margin:0;}}</style></head><body>' + pages + '</body></html>');
+    w.document.close(); w.focus();
+    setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
+  }
+
   document.getElementById('reportBtn').addEventListener('click', printReport);
   document.getElementById('exportBtn').addEventListener('click', exportCsv);
+  document.getElementById('exportDecBtn').addEventListener('click', exportDecisions);
+  document.getElementById('hoClose').addEventListener('click', closeHandoffs);
+  document.getElementById('hoCancel').addEventListener('click', closeHandoffs);
+  document.getElementById('hoPrintAll').addEventListener('click', function () { printHandoffs(handoffState.packets.map(function (_, i) { return i; })); });
+  document.getElementById('handoffModal').addEventListener('click', function (e) { if (e.target === this) closeHandoffs(); });
 
   // ---- client detail modal (edit / add / notes) ----
   var cm = { id: null };
