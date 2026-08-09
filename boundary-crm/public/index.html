@@ -50,14 +50,33 @@
 
   .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
 
-  /* ===== LOGIN GATE ===== */
+  /* ===== LOGIN GATE / FRONT DOOR ===== */
   .gate {
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    padding: 24px;
+    padding: 40px 24px;
   }
+  .landing {
+    display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px;
+    align-items: center; max-width: 1000px; width: 100%;
+  }
+  .pitch { max-width: 480px; }
+  .pitch-h {
+    font-family: 'Fraunces', serif; font-size: clamp(30px, 4.2vw, 44px); font-weight: 700;
+    line-height: 1.04; color: var(--navy); letter-spacing: -0.02em; margin: 20px 0 14px;
+  }
+  .pitch-h em { font-style: italic; color: var(--coral-deep); }
+  .pitch-sub { font-size: 16px; color: var(--gray); margin-bottom: 24px; line-height: 1.6; }
+  .pitch-list { list-style: none; display: flex; flex-direction: column; gap: 13px; }
+  .pitch-list li { position: relative; padding-left: 32px; font-size: 15px; color: var(--navy); line-height: 1.45; }
+  .pitch-list li::before {
+    content: '✓'; position: absolute; left: 0; top: -1px;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--coral-soft); color: var(--coral-deep);
+    font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .pitch-foot { font-size: 13px; color: var(--gray); margin-top: 24px; line-height: 1.5; }
   .gate-card {
     background: white; border-radius: 24px; box-shadow: var(--shadow-lg);
-    padding: 40px 32px; max-width: 420px; width: 100%;
+    padding: 40px 32px; width: 100%;
     border: 1px solid rgba(31, 58, 61, 0.08);
   }
   .gate-mark {
@@ -67,8 +86,8 @@
     box-shadow: var(--shadow-sm); margin-bottom: 20px;
   }
   .gate-card h1 {
-    font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700;
-    color: var(--navy); letter-spacing: -0.01em; line-height: 1.1; margin-bottom: 10px;
+    font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700;
+    color: var(--navy); letter-spacing: -0.01em; line-height: 1.15; margin-bottom: 10px;
   }
   .gate-card h1 em { font-style: italic; color: var(--coral-deep); }
   .gate-sub { font-size: 15px; color: var(--gray); margin-bottom: 26px; }
@@ -206,6 +225,13 @@
   }
   footer a { color: var(--coral-deep); text-decoration: none; font-weight: 600; }
 
+  @media (max-width: 860px) {
+    .landing { grid-template-columns: 1fr; gap: 30px; max-width: 460px; }
+    .pitch { max-width: 460px; }
+    .pitch-h { font-size: clamp(28px, 8vw, 36px); }
+    .pitch-list { display: none; }
+    .pitch-foot { display: none; }
+  }
   @media (max-width: 640px) {
     .gate-card { padding: 32px 24px; }
     .hero h2 { font-size: 30px; }
@@ -799,30 +825,44 @@
   <div class="shape shape-1"></div>
   <div class="shape shape-2"></div>
 
-  <!-- ============ LOGIN GATE ============ -->
+  <!-- ============ LOGIN GATE / FRONT DOOR ============ -->
   <div class="gate" id="gate">
-    <div class="gate-card">
-      <div class="gate-mark">B</div>
-
-      <div class="gate-form" id="gateForm">
-        <h1>Sign in to <em>Boundary CRM</em></h1>
-        <p class="gate-sub">Enter your email and we will send you a one-time sign-in link. No password to remember.</p>
-        <label class="field-label" for="email">Your email</label>
-        <input class="field-input" id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@yourfirm.com" />
-        <button class="btn-primary" id="sendBtn">Send my sign-in link</button>
-        <div class="gate-error" id="gateError"></div>
-        <p class="gate-note">Boundary CRM is the paid product the Client Analyzer graduates into. Your client list stays private to your firm.</p>
+    <div class="landing">
+      <div class="pitch">
+        <div class="gate-mark">B</div>
+        <span class="hero-eyebrow">For solo and small-firm accountants</span>
+        <h1 class="pitch-h">Decide who to keep, raise, nudge, and <em>let go.</em></h1>
+        <p class="pitch-sub">Boundary CRM turns your client list into clear calls. It scores every client, sorts them A to D, and drafts the message for each one, so you can re-price your book without the dread.</p>
+        <ul class="pitch-list">
+          <li>Score each client by realized rate and sort them A to D.</li>
+          <li>Work in small batches, one client at a time.</li>
+          <li>Draft the message in your voice. You send it from your own inbox.</li>
+          <li>Nothing is ever sent or changed without you.</li>
+        </ul>
+        <p class="pitch-foot">Grows out of the free Client Analyzer. Your client list stays private to your firm.</p>
       </div>
 
-      <div class="gate-sent" id="gateSent">
-        <div class="sent-icon">✉️</div>
-        <h1>Check your email</h1>
-        <p class="gate-sub">If <b id="sentEmail"></b> has an account, a sign-in link is on its way. It expires in 15 minutes and works once.</p>
-        <div class="dev-link-box" id="devLinkBox" style="display:none;">
-          <span class="tag">Dev mode · no mail provider configured</span>
-          <a id="devLink" href="#">Open sign-in link</a>
+      <div class="gate-card">
+        <div class="gate-form" id="gateForm">
+          <h1>Sign in or start<em> your firm</em></h1>
+          <p class="gate-sub">Enter your email and we will send you a one-time link. No password to remember. New here? This creates your firm.</p>
+          <label class="field-label" for="email">Your email</label>
+          <input class="field-input" id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@yourfirm.com" />
+          <button class="btn-primary" id="sendBtn">Send my sign-in link</button>
+          <div class="gate-error" id="gateError"></div>
+          <p class="gate-note">One link, one firm. Your clients and numbers are visible only to you.</p>
         </div>
-        <button class="link-btn" id="backBtn">Use a different email</button>
+
+        <div class="gate-sent" id="gateSent">
+          <div class="sent-icon">✉️</div>
+          <h1>Check your email</h1>
+          <p class="gate-sub">If <b id="sentEmail"></b> has an account, a sign-in link is on its way. It expires in 15 minutes and works once.</p>
+          <div class="dev-link-box" id="devLinkBox" style="display:none;">
+            <span class="tag">Dev mode · no mail provider configured</span>
+            <a id="devLink" href="#">Open sign-in link</a>
+          </div>
+          <button class="link-btn" id="backBtn">Use a different email</button>
+        </div>
       </div>
     </div>
   </div>
