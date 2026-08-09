@@ -99,4 +99,18 @@ export interface Firm {
   owner_email: string;
   name: string | null;
   created_at: number;
+  min_fee: number | null;
+  batch_size: number | null;
+}
+
+export interface Season {
+  id: string;
+  firm_id: string;
+  label: string;
+  decided: number;
+  committed: number;
+  potential: number;
+  tiers: string | null;
+  actions: string | null;
+  closed_at: number;
 }

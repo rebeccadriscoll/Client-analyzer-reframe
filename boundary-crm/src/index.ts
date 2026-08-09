@@ -16,6 +16,9 @@ import {
   deleteClient,
   addNote,
   getNotes,
+  updateSettings,
+  listSeasons,
+  closeSeason,
   type ClientFields,
   getDecisions,
   upsertDecision,
@@ -93,6 +96,18 @@ export default {
       }
       if (pathname === "/api/overview" && request.method === "GET") {
         return await handleOverview(request, env);
+      }
+      if (pathname === "/api/settings" && request.method === "GET") {
+        return await handleSettingsGet(request, env);
+      }
+      if (pathname === "/api/settings" && request.method === "POST") {
+        return await handleSettingsSave(request, env);
+      }
+      if (pathname === "/api/seasons" && request.method === "GET") {
+        return await handleSeasonsList(request, env);
+      }
+      if (pathname === "/api/seasons/close" && request.method === "POST") {
+        return await handleSeasonClose(request, env);
       }
       if (pathname === "/api/import/preview" && request.method === "POST") {
         return await handleImportPreview(request, env);
@@ -189,7 +204,10 @@ async function handleMe(request: Request, env: Env): Promise<Response> {
   const cookies = parseCookies(request.headers.get("Cookie"));
   const firm = await getFirmBySession(env, cookies[SESSION_COOKIE]);
   if (!firm) return json({ authenticated: false }, 401);
-  return json({ authenticated: true, firm: { email: firm.owner_email, name: firm.name } });
+  return json({
+    authenticated: true,
+    firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size },
+  });
 }
 
 /** POST /api/auth/logout — revoke the session and clear the cookie. */
@@ -303,6 +321,80 @@ async function handleNotesAdd(request: Request, env: Env): Promise<Response> {
   if (!(await clientBelongsToFirm(env, firm.id, body.client_id))) return json({ error: "not_found" }, 404);
   const note = await addNote(env, firm.id, body.client_id, body.body.trim());
   return json({ note });
+}
+
+/** GET /api/settings — firm-level settings. */
+async function handleSettingsGet(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  return json({ firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size } });
+}
+
+/** POST /api/settings { name?, min_fee?, batch_size? } — save firm settings. */
+async function handleSettingsSave(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  if (!body) return json({ error: "bad_request" }, 400);
+  const numOrNull = (v: unknown) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.\-]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
+  const name = typeof body.name === "string" && body.name.trim() !== "" ? body.name.trim() : null;
+  const min_fee = numOrNull(body.min_fee);
+  const bsRaw = numOrNull(body.batch_size);
+  const batch_size = bsRaw != null ? Math.max(1, Math.round(bsRaw)) : null;
+  const updated = await updateSettings(env, firm.id, { name, min_fee, batch_size });
+  return json({ firm: { email: updated.owner_email, name: updated.name, min_fee: updated.min_fee, batch_size: updated.batch_size } });
+}
+
+/** GET /api/seasons — past closed seasons. */
+async function handleSeasonsList(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const seasons = await listSeasons(env, firm.id);
+  return json({
+    seasons: seasons.map((s) => ({
+      ...s,
+      tiers: s.tiers ? JSON.parse(s.tiers) : null,
+      actions: s.actions ? JSON.parse(s.actions) : null,
+    })),
+  });
+}
+
+/** POST /api/seasons/close { label } — snapshot the cycle and start fresh. */
+async function handleSeasonClose(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  const label = body && typeof body.label === "string" && body.label.trim() !== "" ? body.label.trim() : "Season";
+
+  const [clients, decisions, commitments] = await Promise.all([
+    listClients(env, firm.id),
+    getDecisions(env, firm.id),
+    getCommitments(env, firm.id),
+  ]);
+  if (decisions.length === 0) return json({ error: "nothing_to_close" }, 400);
+
+  const byId = new Map(clients.map((c) => [c.id, c]));
+  const actions: Record<Action, number> = { keep: 0, raise: 0, nudge: 0, fire: 0 };
+  for (const d of decisions) actions[d.action]++;
+  const committed = commitments.filter((c) => c.state === "agreed").reduce((s, c) => s + (c.committed_fee ?? 0), 0);
+  let potential = 0;
+  for (const d of decisions) {
+    const c = byId.get(d.client_id);
+    if (c && d.action !== "fire") potential += proposedFee(c, d);
+  }
+  const season = await closeSeason(env, firm.id, {
+    label,
+    decided: decisions.length,
+    committed,
+    potential,
+    tiers: tierCounts(clients),
+    actions,
+  });
+  return json({ season: { ...season, tiers: JSON.parse(season.tiers!), actions: JSON.parse(season.actions!) } });
 }
 
 const SILENT_DAYS = 7;
