@@ -1624,6 +1624,7 @@
   // ---- the words (Section 03) ----
   var words = { items: [], filter: 'all', voiceCount: 0, voiceReady: false };
   var WORD_LABEL = { keep: 'Keep', raise: 'Raise', nudge: 'Nudge', fire: 'Let go' };
+  var SEND_SUBJECTS = { keep: 'A quick note about your account', raise: 'Your fee for the year ahead', nudge: 'A note about the year ahead', fire: 'A change to your accounting' };
 
   async function loadWords() {
     try {
@@ -1694,7 +1695,7 @@
     card.className = 'word-card';
     card.dataset.cid = c.id;
     var sub = (d.action === 'raise' && d.new_fee != null ? 'New fee ' + money(d.new_fee) + ' · ' : '') +
-      (c.email ? c.email : 'No email on file');
+      (c.email || c.entity_type || '');
     card.innerHTML =
       '<div class="word-head">' +
         '<span class="word-name"></span>' +
@@ -1709,7 +1710,7 @@
         '<button class="btn btn-ghost act-voice" title="Save this wording as your voice and redraft the others to match">Draft the rest in my voice</button>' +
         '<button class="btn btn-ghost act-copy">Copy</button>' +
         '<button class="btn btn-primary act-save" disabled>Save</button>' +
-        '<button class="btn act-send" disabled>Send</button>' +
+        '<button class="btn act-send" disabled>Send from my email</button>' +
         '<span class="word-status"></span>' +
       '</div>';
     card.querySelector('.word-name').textContent = c.name;
@@ -1724,12 +1725,12 @@
     draftBtn.textContent = d.drafted_message ? 'Regenerate' : 'Draft message';
     if (d.drafted_message) { status.className = 'word-status saved'; status.textContent = 'Saved'; }
     voiceBtn.disabled = ta.value.trim().length < 10;
-    sendBtn.disabled = !c.email || ta.value.trim() === '';
-    if (!c.email) sendBtn.title = 'No email on file. Re-import your clients with an email column to send.';
+    sendBtn.disabled = ta.value.trim() === '';
+    sendBtn.title = 'Mark told and open this message in your own email app to send';
 
     function refreshSendVoice() {
       voiceBtn.disabled = ta.value.trim().length < 10;
-      sendBtn.disabled = !c.email || ta.value.trim() === '';
+      sendBtn.disabled = ta.value.trim() === '';
     }
     var saveTimer = null;
     function markUnsaved() {
@@ -1794,20 +1795,24 @@
     });
 
     sendBtn.addEventListener('click', async function () {
-      if (!c.email || ta.value.trim() === '') return;
-      if (!window.confirm('Send this message to ' + c.email + '?\n\nThis emails the client their message and confirm link, and marks them as told.')) return;
-      var prev = sendBtn.textContent;
-      sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+      if (ta.value.trim() === '') return;
+      sendBtn.disabled = true; sendBtn.textContent = 'Preparing…';
       try {
-        // Make the saved copy match what is on screen, then send.
+        // Make the saved copy match what is on screen, then get the link + mark told.
         await fetch('/api/words/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id, message: ta.value }) });
         d.drafted_message = ta.value;
-        var res = await fetch('/api/words/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id }) });
+        var res = await fetch('/api/words/handoff', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: c.id }) });
         var data = await res.json().catch(function () { return {}; });
-        if (res.ok) { sendBtn.textContent = 'Sent ✓'; status.className = 'word-status saved'; status.textContent = 'Sent · marked told'; }
-        else { sendBtn.textContent = 'Send'; sendBtn.disabled = false; status.className = 'word-status err'; status.textContent = sendErr(data); }
+        if (!res.ok) { sendBtn.textContent = 'Send from my email'; sendBtn.disabled = false; status.className = 'word-status err'; status.textContent = sendErr(data); return; }
+        var full = ta.value + '\n\nConfirm here: ' + data.link;
+        if (navigator.clipboard) { try { navigator.clipboard.writeText(full); } catch (e) { /* ignore */ } }
+        var to = data.email ? encodeURIComponent(data.email) : '';
+        var subject = encodeURIComponent(SEND_SUBJECTS[d.action] || 'A note about your account');
+        window.location.href = 'mailto:' + to + '?subject=' + subject + '&body=' + encodeURIComponent(full);
+        sendBtn.textContent = 'Opened in your email ✓';
+        status.className = 'word-status saved'; status.textContent = 'Marked told · finish in your email app';
       } catch (e) {
-        sendBtn.textContent = 'Send'; sendBtn.disabled = false; status.className = 'word-status err'; status.textContent = 'Could not send. Try again.';
+        sendBtn.textContent = 'Send from my email'; sendBtn.disabled = false; status.className = 'word-status err'; status.textContent = 'Could not prepare. Try again.';
       }
     });
 
@@ -1816,11 +1821,9 @@
 
   function sendErr(d) {
     switch (d && d.error) {
-      case 'no_email': return 'No email on file for this client.';
-      case 'no_message': return 'Write a message first.';
-      case 'email_not_configured': return 'Add your Brevo key to the Worker first.';
+      case 'no_message': return 'Write and save a message first.';
       case 'no_decision': return 'Decide on this client first.';
-      default: return 'Could not send. Try again.';
+      default: return 'Could not prepare. Try again.';
     }
   }
 

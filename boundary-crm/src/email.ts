@@ -1,4 +1,4 @@
-import type { Env, Action } from "./types";
+import type { Env } from "./types";
 
 export interface MagicEmailResult {
   /** True when the link was dispatched to an email provider. */
@@ -54,54 +54,11 @@ export async function sendMagicLink(env: Env, email: string, link: string): Prom
   return { sent: true };
 }
 
-const CLIENT_SUBJECTS: Record<Action, string> = {
-  keep: "A quick note about your account",
-  raise: "Your fee for the year ahead",
-  nudge: "A note about the year ahead",
-  fire: "A change to your accounting",
-};
-
-/**
- * Send the owner's drafted message to a client, with their confirm link.
- * Requires BREVO_API_KEY (the caller checks first).
- */
-export async function sendClientMessage(
-  env: Env,
-  to: string,
-  action: Action,
-  message: string,
-  link: string
-): Promise<void> {
-  const subject = CLIENT_SUBJECTS[action];
-  const text = `${message}\n\nConfirm here: ${link}`;
-  await brevoSend(env, to, subject, text, clientEmailHtml(message, link));
-}
-
 /** Parse a "Name <email>" string into Brevo's sender shape. */
 function parseSender(from: string): { name: string; email: string } {
   const m = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
   if (m) return { name: m[1] || "Boundary CRM", email: m[2].trim() };
   return { name: "Boundary CRM", email: from.trim() };
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
-
-function clientEmailHtml(message: string, link: string): string {
-  const body = escapeHtml(message).replace(/\n/g, "<br>");
-  return `<!doctype html>
-<html>
-  <body style="margin:0;background:#FAF3E7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1F3A3D;">
-    <div style="max-width:520px;margin:0 auto;padding:40px 24px;">
-      <p style="font-size:15px;line-height:1.6;">${body}</p>
-      <p style="margin:28px 0;">
-        <a href="${link}" style="display:inline-block;background:#F47A6A;color:#ffffff;text-decoration:none;font-weight:600;padding:13px 22px;border-radius:12px;">Confirm</a>
-      </p>
-      <p style="font-size:12px;color:#6B6B6B;line-height:1.5;">If the button does not work, paste this link into your browser:<br><span style="color:#C44536;word-break:break-all;">${link}</span></p>
-    </div>
-  </body>
-</html>`;
 }
 
 function magicEmailHtml(link: string): string {
