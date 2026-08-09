@@ -1,8 +1,9 @@
 import type {
   Env, Firm, Client, Tier, Action, Decision,
-  Wave, WaveType, WaveStatus, Commitment, CommitmentState, VoiceSample,
+  Wave, WaveType, WaveStatus, Commitment, CommitmentState, VoiceSample, Note,
 } from "./types";
 import { randomToken, sha256Hex } from "./crypto";
+import { realizedRate, computeTiers } from "./scoring";
 
 const MAGIC_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -161,11 +162,87 @@ export async function listClients(env: Env, firmId: string): Promise<Client[]> {
   return res.results ?? [];
 }
 
+export interface ClientFields {
+  name: string;
+  email: string | null;
+  entity_type: string | null;
+  return_type: string | null;
+  annual_fee: number | null;
+  est_hours: number | null;
+}
+
+/** Recompute A-D tiers across a firm's whole book (after any add/edit/delete). */
+export async function retierFirm(env: Env, firmId: string): Promise<void> {
+  const clients = await listClients(env, firmId);
+  const tiers = computeTiers(clients, (c) => c.realized_rate);
+  const stmts = clients.map((c, i) =>
+    env.DB.prepare("UPDATE client SET tier = ? WHERE id = ?").bind(tiers[i], c.id)
+  );
+  if (stmts.length) await env.DB.batch(stmts);
+}
+
+/** Create a single client by hand, then re-tier. */
+export async function createClient(env: Env, firmId: string, f: ClientFields): Promise<Client> {
+  const client: Client = {
+    id: crypto.randomUUID(),
+    firm_id: firmId,
+    name: f.name,
+    email: f.email,
+    entity_type: f.entity_type,
+    return_type: f.return_type,
+    annual_fee: f.annual_fee,
+    est_hours: f.est_hours,
+    realized_rate: realizedRate(f.annual_fee, f.est_hours),
+    tier: null,
+    flags: null,
+    created_at: Date.now(),
+  };
+  await env.DB.prepare(
+    `INSERT INTO client (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(client.id, firmId, client.name, client.email, client.entity_type, client.return_type,
+      client.annual_fee, client.est_hours, client.realized_rate, client.tier, client.flags, client.created_at)
+    .run();
+  await retierFirm(env, firmId);
+  return (await getClient(env, firmId, client.id))!;
+}
+
+/** Update a client's fields, recompute its realized rate, then re-tier. */
+export async function updateClient(env: Env, firmId: string, id: string, f: ClientFields): Promise<Client | null> {
+  const existing = await getClient(env, firmId, id);
+  if (!existing) return null;
+  const rate = realizedRate(f.annual_fee, f.est_hours);
+  await env.DB.prepare(
+    `UPDATE client SET name = ?, email = ?, entity_type = ?, return_type = ?, annual_fee = ?, est_hours = ?, realized_rate = ?
+     WHERE id = ? AND firm_id = ?`
+  )
+    .bind(f.name, f.email, f.entity_type, f.return_type, f.annual_fee, f.est_hours, rate, id, firmId)
+    .run();
+  await retierFirm(env, firmId);
+  return getClient(env, firmId, id);
+}
+
+/** Delete one client and everything hanging off it, then re-tier. */
+export async function deleteClient(env: Env, firmId: string, id: string): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM note WHERE client_id = ? AND firm_id = ?").bind(id, firmId),
+    env.DB.prepare("DELETE FROM commitment WHERE client_id = ? AND firm_id = ?").bind(id, firmId),
+    env.DB.prepare("DELETE FROM decision WHERE client_id = ? AND firm_id = ?").bind(id, firmId),
+    env.DB.prepare("DELETE FROM client WHERE id = ? AND firm_id = ?").bind(id, firmId),
+  ]);
+  await retierFirm(env, firmId);
+}
+
 /** Remove every client for a firm (used by "replace" re-import). */
 export async function deleteClientsForFirm(env: Env, firmId: string): Promise<void> {
-  // Decisions reference clients, so clear them first to keep the data consistent.
-  await env.DB.prepare("DELETE FROM decision WHERE firm_id = ?").bind(firmId).run();
-  await env.DB.prepare("DELETE FROM client WHERE firm_id = ?").bind(firmId).run();
+  // Clear everything that references clients first, to keep the data consistent.
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM note WHERE firm_id = ?").bind(firmId),
+    env.DB.prepare("DELETE FROM commitment WHERE firm_id = ?").bind(firmId),
+    env.DB.prepare("DELETE FROM decision WHERE firm_id = ?").bind(firmId),
+    env.DB.prepare("DELETE FROM client WHERE firm_id = ?").bind(firmId),
+  ]);
 }
 
 /** One client, scoped to the firm, or null. */
@@ -340,6 +417,31 @@ export async function getCommitmentContextByToken(
     .first<Decision>();
   if (!client || !decision) return null;
   return { commitment, client, decision };
+}
+
+// ---- notes ----
+
+export async function addNote(env: Env, firmId: string, clientId: string, bodyText: string): Promise<Note> {
+  const note: Note = {
+    id: crypto.randomUUID(),
+    firm_id: firmId,
+    client_id: clientId,
+    body: bodyText,
+    created_at: Date.now(),
+  };
+  await env.DB.prepare("INSERT INTO note (id, firm_id, client_id, body, created_at) VALUES (?, ?, ?, ?, ?)")
+    .bind(note.id, note.firm_id, note.client_id, note.body, note.created_at)
+    .run();
+  return note;
+}
+
+export async function getNotes(env: Env, firmId: string, clientId: string): Promise<Note[]> {
+  const res = await env.DB.prepare(
+    "SELECT * FROM note WHERE firm_id = ? AND client_id = ? ORDER BY created_at DESC"
+  )
+    .bind(firmId, clientId)
+    .all<Note>();
+  return res.results ?? [];
 }
 
 // ---- voice samples (The Words) ----

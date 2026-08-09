@@ -51,6 +51,14 @@ export interface Wave {
   status: WaveStatus;
 }
 
+export interface Note {
+  id: string;
+  firm_id: string;
+  client_id: string;
+  body: string;
+  created_at: number;
+}
+
 export interface VoiceSample {
   id: string;
   firm_id: string;

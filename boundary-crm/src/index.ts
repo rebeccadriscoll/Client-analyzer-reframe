@@ -11,6 +11,12 @@ import {
   listClients,
   deleteClientsForFirm,
   clientBelongsToFirm,
+  createClient,
+  updateClient,
+  deleteClient,
+  addNote,
+  getNotes,
+  type ClientFields,
   getDecisions,
   upsertDecision,
   getDecisionForClient,
@@ -69,6 +75,24 @@ export default {
       }
       if (pathname === "/api/clients" && request.method === "GET") {
         return await handleListClients(request, env);
+      }
+      if (pathname === "/api/clients/create" && request.method === "POST") {
+        return await handleClientCreate(request, env);
+      }
+      if (pathname === "/api/clients/update" && request.method === "POST") {
+        return await handleClientUpdate(request, env);
+      }
+      if (pathname === "/api/clients/delete" && request.method === "POST") {
+        return await handleClientDelete(request, env);
+      }
+      if (pathname === "/api/notes/list" && request.method === "POST") {
+        return await handleNotesList(request, env);
+      }
+      if (pathname === "/api/notes/add" && request.method === "POST") {
+        return await handleNotesAdd(request, env);
+      }
+      if (pathname === "/api/overview" && request.method === "GET") {
+        return await handleOverview(request, env);
       }
       if (pathname === "/api/import/preview" && request.method === "POST") {
         return await handleImportPreview(request, env);
@@ -189,6 +213,153 @@ async function handleListClients(request: Request, env: Env): Promise<Response> 
   if (!firm) return json({ error: "unauthorized" }, 401);
   const clients = await listClients(env, firm.id);
   return json({ clients, tiers: tierCounts(clients), count: clients.length });
+}
+
+function parseClientFields(b: Record<string, unknown>): ClientFields | null {
+  const name = typeof b.name === "string" ? b.name.trim() : "";
+  if (!name) return null;
+  const str = (v: unknown) => (typeof v === "string" && v.trim() !== "" ? v.trim() : null);
+  const num = (v: unknown) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.\-]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
+  return {
+    name,
+    email: str(b.email),
+    entity_type: str(b.entity_type),
+    return_type: str(b.return_type),
+    annual_fee: num(b.annual_fee),
+    est_hours: num(b.est_hours),
+  };
+}
+
+async function readJson(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    return (await request.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** POST /api/clients/create — add a client by hand. */
+async function handleClientCreate(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  if (!body) return json({ error: "bad_request" }, 400);
+  const fields = parseClientFields(body);
+  if (!fields) return json({ error: "name_required" }, 400);
+  const client = await createClient(env, firm.id, fields);
+  const clients = await listClients(env, firm.id);
+  return json({ client, clients, tiers: tierCounts(clients), count: clients.length });
+}
+
+/** POST /api/clients/update — edit a client's fields. */
+async function handleClientUpdate(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  if (!body || typeof body.id !== "string") return json({ error: "bad_request" }, 400);
+  const fields = parseClientFields(body);
+  if (!fields) return json({ error: "name_required" }, 400);
+  const client = await updateClient(env, firm.id, body.id, fields);
+  if (!client) return json({ error: "not_found" }, 404);
+  const clients = await listClients(env, firm.id);
+  return json({ client, clients, tiers: tierCounts(clients), count: clients.length });
+}
+
+/** POST /api/clients/delete — remove a client and its decision/notes. */
+async function handleClientDelete(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  if (!body || typeof body.id !== "string") return json({ error: "bad_request" }, 400);
+  if (!(await clientBelongsToFirm(env, firm.id, body.id))) return json({ error: "not_found" }, 404);
+  await deleteClient(env, firm.id, body.id);
+  const clients = await listClients(env, firm.id);
+  return json({ ok: true, clients, tiers: tierCounts(clients), count: clients.length });
+}
+
+/** POST /api/notes/list — a client's notes, newest first. */
+async function handleNotesList(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  if (!body || typeof body.client_id !== "string") return json({ error: "bad_request" }, 400);
+  if (!(await clientBelongsToFirm(env, firm.id, body.client_id))) return json({ error: "not_found" }, 404);
+  const notes = await getNotes(env, firm.id, body.client_id);
+  return json({ notes });
+}
+
+/** POST /api/notes/add — append a note to a client. */
+async function handleNotesAdd(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  if (!body || typeof body.client_id !== "string" || typeof body.body !== "string" || body.body.trim() === "") {
+    return json({ error: "bad_request" }, 400);
+  }
+  if (!(await clientBelongsToFirm(env, firm.id, body.client_id))) return json({ error: "not_found" }, 404);
+  const note = await addNote(env, firm.id, body.client_id, body.body.trim());
+  return json({ note });
+}
+
+const SILENT_DAYS = 7;
+
+/** GET /api/overview — dashboard aggregates + a suggested next step. */
+async function handleOverview(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  const [clients, decisions, commitments] = await Promise.all([
+    listClients(env, firm.id),
+    getDecisions(env, firm.id),
+    getCommitments(env, firm.id),
+  ]);
+  const byId = new Map(clients.map((c) => [c.id, c]));
+
+  const actions: Record<Action, number> = { keep: 0, raise: 0, nudge: 0, fire: 0 };
+  for (const d of decisions) actions[d.action]++;
+  const draftedMissing = decisions.filter((d) => !d.drafted_message).length;
+  const committed = commitments
+    .filter((c) => c.state === "agreed")
+    .reduce((s, c) => s + (c.committed_fee ?? 0), 0);
+  let potential = 0;
+  for (const d of decisions) {
+    const c = byId.get(d.client_id);
+    if (c && d.action !== "fire") potential += proposedFee(c, d);
+  }
+  const now = Date.now();
+  const silent = commitments.filter(
+    (c) => c.state === "told" && now - c.updated_at > SILENT_DAYS * 86400000
+  ).length;
+  const bookRevenue = clients.reduce((s, c) => s + (c.annual_fee ?? 0), 0);
+  const p = (n: number) => (n === 1 ? "" : "s");
+
+  let next: { label: string; tab: string };
+  if (clients.length === 0) next = { label: "Import your clients to get started.", tab: "import" };
+  else if (decisions.length < clients.length)
+    next = { label: `Decide on ${clients.length - decisions.length} more client${p(clients.length - decisions.length)}.`, tab: "decide" };
+  else if (draftedMissing > 0)
+    next = { label: `Draft ${draftedMissing} message${p(draftedMissing)}.`, tab: "words" };
+  else if (silent > 0)
+    next = { label: `Follow up with ${silent} silent client${p(silent)}.`, tab: "tracker" };
+  else next = { label: "You are all caught up.", tab: "tracker" };
+
+  return json({
+    clients: clients.length,
+    tiers: tierCounts(clients),
+    decided: decisions.length,
+    undecided: clients.length - decisions.length,
+    actions,
+    draftedMissing,
+    committed,
+    potential,
+    silent,
+    bookRevenue,
+    next,
+  });
 }
 
 /** POST /api/import/preview { csv } — parse and suggest a column mapping. */
@@ -498,6 +669,7 @@ async function handleRollout(request: Request, env: Env): Promise<Response> {
         state: comm?.state ?? null,
         link_token: comm?.link_token ?? null,
         committed_fee: comm?.committed_fee ?? null,
+        updated_at: comm?.updated_at ?? null,
       };
     })
     .filter((t): t is NonNullable<typeof t> => t != null);
