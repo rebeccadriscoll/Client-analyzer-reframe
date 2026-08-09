@@ -22,6 +22,8 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   /** Claude model id for voice drafting. Defaults to a Haiku model. */
   DRAFT_MODEL?: string;
+  /** Claude model id for the in-app assistant. Falls back to DRAFT_MODEL, then a Haiku model. */
+  ASSISTANT_MODEL?: string;
   /** Public base URL used to build sign-in links. Falls back to the request origin. */
   APP_URL?: string;
 }

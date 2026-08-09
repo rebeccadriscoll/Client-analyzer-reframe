@@ -34,6 +34,9 @@
     "MAIL_FROM": "Boundary CRM <login@rdriscollcpa.com>",
     // Claude model for voice drafting in The Words. ANTHROPIC_API_KEY is a
     // secret; without it, drafts use the built-in template.
-    "DRAFT_MODEL": "claude-haiku-4-5-20251001"
+    "DRAFT_MODEL": "claude-haiku-4-5-20251001",
+    // Claude model for the in-app assistant (the Ask chat). Shares the same
+    // ANTHROPIC_API_KEY secret; without it, the assistant is switched off.
+    "ASSISTANT_MODEL": "claude-haiku-4-5-20251001"
   }
 }

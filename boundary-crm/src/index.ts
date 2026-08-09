@@ -38,6 +38,7 @@ import {
 } from "./db";
 import type { Action, WaveType, WaveStatus, CommitmentState } from "./types";
 import { generateWords } from "./words";
+import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
 import { sendMagicLink } from "./email";
@@ -144,6 +145,9 @@ export default {
       }
       if (pathname === "/api/commitments" && request.method === "POST") {
         return await handleSaveCommitment(request, env);
+      }
+      if (pathname === "/api/assistant" && request.method === "POST") {
+        return await handleAssistant(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -827,6 +831,48 @@ async function handleSaveCommitment(request: Request, env: Env): Promise<Respons
   const committed_fee = state === "agreed" ? proposedFee(client, decision) : 0;
   const commitment = await upsertCommitment(env, firm.id, b.client_id, { state, committed_fee });
   return json({ commitment });
+}
+
+const MAX_CHAT_TURNS = 30;
+const MAX_CHAT_CHARS = 4000;
+
+/** POST /api/assistant { messages } — the in-app Claude assistant (tool-use). */
+async function handleAssistant(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+
+  const body = await readJson(request);
+  if (!body || !Array.isArray(body.messages)) return json({ error: "bad_request" }, 400);
+
+  const history: ChatMessage[] = [];
+  for (const m of body.messages as unknown[]) {
+    if (!m || typeof m !== "object") continue;
+    const role = (m as { role?: unknown }).role;
+    const content = (m as { content?: unknown }).content;
+    if ((role === "user" || role === "assistant") && typeof content === "string" && content.trim() !== "") {
+      history.push({ role, content: content.slice(0, MAX_CHAT_CHARS) });
+    }
+  }
+  if (history.length === 0) return json({ error: "empty" }, 400);
+  if (history.length > MAX_CHAT_TURNS) history.splice(0, history.length - MAX_CHAT_TURNS);
+  if (history[history.length - 1].role !== "user") return json({ error: "bad_request" }, 400);
+
+  if (!env.ANTHROPIC_API_KEY) {
+    return json({
+      reply:
+        "The assistant is not switched on yet. It needs an Anthropic API key set on the app, then it will answer here.",
+      actions: [],
+      ready: false,
+    });
+  }
+
+  try {
+    const result = await runAssistant(env, firm, history);
+    return json({ ...result, ready: true });
+  } catch (err) {
+    console.error("assistant error:", err);
+    return json({ error: "assistant_failed" }, 502);
+  }
 }
 
 /** GET /c/:token — public confirm page. */

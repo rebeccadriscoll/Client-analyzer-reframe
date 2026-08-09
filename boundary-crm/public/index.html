@@ -719,6 +719,80 @@
   table.ctable th.sortable:hover { color: var(--navy); }
   table.ctable th .arr { opacity: 0.5; font-size: 9px; }
   .pf-none { font-size: 14px; color: var(--gray); font-style: italic; padding: 16px; }
+
+  /* ===== ASK ASSISTANT ===== */
+  .ask-fab {
+    position: fixed; right: 22px; bottom: 22px; z-index: 70;
+    display: inline-flex; align-items: center; gap: 9px;
+    background: var(--coral); color: white; border: none; cursor: pointer;
+    font-family: 'Inter'; font-size: 14px; font-weight: 700;
+    padding: 13px 20px; border-radius: 100px; box-shadow: var(--shadow-lg);
+    transition: transform .12s ease, background .15s ease;
+  }
+  .ask-fab:hover { transform: translateY(-2px); background: var(--coral-deep); }
+  .ask-fab .spark { font-size: 16px; }
+  .ask-fab.hidden { display: none; }
+
+  .ask-drawer {
+    position: fixed; right: 22px; bottom: 22px; z-index: 71;
+    width: 400px; max-width: calc(100vw - 32px);
+    height: 620px; max-height: calc(100vh - 44px);
+    background: var(--cream); border-radius: 22px; box-shadow: var(--shadow-lg);
+    display: none; flex-direction: column; overflow: hidden;
+    border: 1px solid var(--gray-light);
+  }
+  .ask-drawer.show { display: flex; }
+  .ask-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; background: var(--navy); color: white; flex: 0 0 auto;
+  }
+  .ask-head .t { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; }
+  .ask-head .s { font-size: 12px; opacity: .75; margin-top: 1px; }
+  .ask-head .x { background: none; border: none; color: white; font-size: 22px; cursor: pointer; line-height: 1; opacity: .8; }
+  .ask-head .x:hover { opacity: 1; }
+  .ask-body { flex: 1 1 auto; overflow-y: auto; padding: 18px; -webkit-overflow-scrolling: touch; }
+  .ask-msg { margin-bottom: 14px; display: flex; }
+  .ask-msg.user { justify-content: flex-end; }
+  .ask-bubble {
+    max-width: 84%; padding: 11px 14px; border-radius: 16px; font-size: 14px;
+    line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;
+  }
+  .ask-msg.assistant .ask-bubble { background: white; color: var(--ink); border-bottom-left-radius: 5px; box-shadow: var(--shadow-sm); }
+  .ask-msg.user .ask-bubble { background: var(--navy); color: white; border-bottom-right-radius: 5px; }
+  .ask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+  .ask-chip {
+    font-size: 11px; font-weight: 600; color: var(--teal);
+    background: rgba(45,106,107,0.10); border: 1px solid rgba(45,106,107,0.25);
+    padding: 4px 10px; border-radius: 100px;
+  }
+  .ask-suggest { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .ask-suggest button {
+    text-align: left; background: white; border: 1px solid var(--gray-light);
+    border-radius: 12px; padding: 10px 13px; font-family: 'Inter'; font-size: 13px;
+    color: var(--navy); cursor: pointer; transition: border-color .12s ease, background .12s ease;
+  }
+  .ask-suggest button:hover { border-color: var(--coral); background: var(--coral-soft); }
+  .ask-intro { font-size: 14px; color: var(--gray); margin-bottom: 12px; line-height: 1.55; }
+  .ask-typing { font-size: 13px; color: var(--gray); font-style: italic; padding: 2px 4px; }
+  .ask-foot { flex: 0 0 auto; padding: 12px; border-top: 1px solid var(--gray-light); background: var(--cream); }
+  .ask-inrow { display: flex; gap: 8px; align-items: flex-end; }
+  .ask-in {
+    flex: 1; resize: none; border: 1px solid var(--gray-light); border-radius: 14px;
+    padding: 10px 12px; font-family: 'Inter'; font-size: 14px; line-height: 1.4;
+    max-height: 120px; background: white; color: var(--ink);
+  }
+  .ask-in:focus { outline: none; border-color: var(--coral); }
+  .ask-send {
+    flex: 0 0 auto; background: var(--coral); color: white; border: none; cursor: pointer;
+    width: 42px; height: 42px; border-radius: 12px; font-size: 18px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .ask-send:hover { background: var(--coral-deep); }
+  .ask-send:disabled { opacity: .45; cursor: default; }
+  .ask-note { font-size: 11px; color: var(--gray); margin-top: 7px; text-align: center; }
+  @media (max-width: 520px) {
+    .ask-drawer { right: 8px; bottom: 8px; left: 8px; width: auto; height: calc(100vh - 16px); }
+  }
 </style>
 </head>
 <body>
@@ -1202,6 +1276,28 @@
     </div>
   </div>
 
+  <!-- ASK ASSISTANT -->
+  <button class="ask-fab hidden" id="askFab" aria-label="Ask the assistant">
+    <span class="spark">✦</span> Ask
+  </button>
+  <div class="ask-drawer" id="askDrawer" role="dialog" aria-label="Assistant">
+    <div class="ask-head">
+      <div>
+        <div class="t">Ask</div>
+        <div class="s">Your book, in plain English</div>
+      </div>
+      <button class="x" id="askClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="ask-body" id="askBody"></div>
+    <div class="ask-foot">
+      <div class="ask-inrow">
+        <textarea class="ask-in" id="askIn" rows="1" placeholder="Ask about your clients…"></textarea>
+        <button class="ask-send" id="askSend" aria-label="Send">➤</button>
+      </div>
+      <div class="ask-note">Nothing here sends an email. It reads and updates your own records.</div>
+    </div>
+  </div>
+
 <script>
   // ---- tab switching ----
   function showTab(id, btn) {
@@ -1253,6 +1349,8 @@
   function showGate() {
     gate.style.display = 'flex';
     app.classList.remove('show');
+    document.getElementById('askFab').classList.add('hidden');
+    closeAsk();
     if (new URLSearchParams(location.search).get('auth') === 'invalid') {
       showError('That sign-in link was invalid or expired. Send a fresh one.');
       history.replaceState({}, '', '/');
@@ -1265,6 +1363,7 @@
     if (email) {
       document.getElementById('whoEmail').textContent = email;
     }
+    document.getElementById('askFab').classList.remove('hidden');
     loadClients();
     loadOverview();
   }
@@ -2765,6 +2864,112 @@
       renderPfTable();
     });
   });
+
+  // ---- Ask assistant ----
+  var askState = { messages: [], busy: false, open: false, greeted: false };
+  var ASK_SUGGESTIONS = [
+    'Give me a summary of my book',
+    'Which A-tier clients have not agreed yet?',
+    'Who has gone silent?',
+    'What should I do next?'
+  ];
+
+  function openAsk() {
+    askState.open = true;
+    document.getElementById('askDrawer').classList.add('show');
+    document.getElementById('askFab').classList.add('hidden');
+    renderAsk();
+    setTimeout(function () { document.getElementById('askIn').focus(); }, 60);
+  }
+  function closeAsk() {
+    askState.open = false;
+    var d = document.getElementById('askDrawer');
+    if (d) d.classList.remove('show');
+    var fab = document.getElementById('askFab');
+    if (fab && app.classList.contains('show')) fab.classList.remove('hidden');
+  }
+
+  function renderAsk() {
+    var body = document.getElementById('askBody');
+    var html = '';
+    if (askState.messages.length === 0) {
+      html += '<div class="ask-intro">Hi. I can look across your clients and answer in plain English. ' +
+        'I can also mark who agreed or declined and jot a note, when you ask. Try one of these:</div>';
+      html += '<div class="ask-suggest">';
+      ASK_SUGGESTIONS.forEach(function (s) {
+        html += '<button type="button" data-q="' + esc(s) + '">' + esc(s) + '</button>';
+      });
+      html += '</div>';
+    } else {
+      askState.messages.forEach(function (m) {
+        html += '<div class="ask-msg ' + m.role + '"><div class="ask-bubble">' + esc(m.content) + '</div></div>';
+        if (m.role === 'assistant' && m.actions && m.actions.length) {
+          html += '<div class="ask-chips">';
+          m.actions.forEach(function (a) {
+            var label = (a.type === 'set_response' ? '✓ ' : '✎ ') + esc(a.client) + ' — ' + esc(a.detail);
+            html += '<span class="ask-chip">' + label + '</span>';
+          });
+          html += '</div>';
+        }
+      });
+    }
+    if (askState.busy) html += '<div class="ask-typing">Thinking…</div>';
+    body.innerHTML = html;
+    body.scrollTop = body.scrollHeight;
+    body.querySelectorAll('.ask-suggest button').forEach(function (b) {
+      b.addEventListener('click', function () { sendAsk(b.getAttribute('data-q')); });
+    });
+  }
+
+  async function sendAsk(text) {
+    var msg = (text != null ? text : document.getElementById('askIn').value).trim();
+    if (!msg || askState.busy) return;
+    document.getElementById('askIn').value = '';
+    autosizeAsk();
+    askState.messages.push({ role: 'user', content: msg });
+    askState.busy = true;
+    renderAsk();
+    try {
+      var payload = askState.messages.map(function (m) { return { role: m.role, content: m.content }; });
+      var res = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: payload })
+      });
+      var data = await res.json();
+      askState.busy = false;
+      if (!res.ok || data.error) {
+        askState.messages.push({ role: 'assistant', content: 'Something went wrong reaching the assistant. Try again in a moment.' });
+      } else {
+        askState.messages.push({ role: 'assistant', content: data.reply || 'Done.', actions: data.actions || [] });
+        if (data.actions && data.actions.length) {
+          // A change landed, so refresh the views that show it.
+          loadOverview();
+          loadClients();
+          if (typeof loadRollout === 'function') loadRollout();
+        }
+      }
+    } catch (e) {
+      askState.busy = false;
+      askState.messages.push({ role: 'assistant', content: 'I could not reach the assistant. Check your connection and try again.' });
+    }
+    renderAsk();
+  }
+
+  function autosizeAsk() {
+    var t = document.getElementById('askIn');
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 120) + 'px';
+  }
+
+  document.getElementById('askFab').addEventListener('click', openAsk);
+  document.getElementById('askClose').addEventListener('click', closeAsk);
+  document.getElementById('askSend').addEventListener('click', function () { sendAsk(); });
+  document.getElementById('askIn').addEventListener('input', autosizeAsk);
+  document.getElementById('askIn').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAsk(); }
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && askState.open) closeAsk(); });
 
   checkSession();
 </script>
