@@ -819,11 +819,25 @@
   @media (max-width: 520px) {
     .ask-drawer { right: 8px; bottom: 8px; left: 8px; width: auto; height: calc(100vh - 16px); }
   }
+
+  /* ===== GLOBAL ERROR FLASH ===== */
+  .flash {
+    position: fixed; left: 50%; top: 20px;
+    transform: translate(-50%, -140%); z-index: 90; max-width: 92vw;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--coral-deep); color: white; font-size: 14px; font-weight: 600;
+    padding: 13px 18px; border-radius: 12px; box-shadow: var(--shadow-lg);
+    opacity: 0; transition: transform .28s ease, opacity .28s ease; pointer-events: none;
+  }
+  .flash.show { transform: translate(-50%, 0); opacity: 1; }
+  .flash .fdot { font-size: 15px; }
 </style>
 </head>
 <body>
   <div class="shape shape-1"></div>
   <div class="shape shape-2"></div>
+
+  <div class="flash" id="flash"><span class="fdot">!</span><span id="flashText"></span></div>
 
   <!-- ============ LOGIN GATE / FRONT DOOR ============ -->
   <div class="gate" id="gate">
@@ -1356,6 +1370,48 @@
   // ---- auth flow ----
   var gate = document.getElementById('gate');
   var app = document.getElementById('app');
+
+  // ---- global API error + session handling ----
+  var flashTimer = null;
+  function flash(msg) {
+    var el = document.getElementById('flash');
+    document.getElementById('flashText').textContent = msg;
+    el.classList.add('show');
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () { el.classList.remove('show'); }, 6000);
+  }
+  var sessionDead = false;
+  function handleSessionExpired() {
+    if (sessionDead) return;
+    sessionDead = true;
+    try { closeAsk(); } catch (e) {}
+    showGate();
+    showError('Your session ended. Sign in again to pick up where you left off.');
+  }
+  // Wrap fetch once so no API failure is ever fully silent: a 401 on a real
+  // request bounces to the sign-in screen, and a failed save shows a toast.
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var method = ((init && init.method) || 'GET').toUpperCase();
+    var isApi = url.indexOf('/api/') !== -1;
+    var isAuth = url.indexOf('/api/auth') !== -1 || url.indexOf('/api/me') !== -1;
+    var isAssistant = url.indexOf('/api/assistant') !== -1; // has its own inline error
+    return _fetch(input, init).then(function (res) {
+      if (isApi && !isAuth) {
+        if (res.status === 401 && app.classList.contains('show')) handleSessionExpired();
+        else if (res.status >= 500 && method !== 'GET' && !isAssistant) {
+          flash('Something went wrong on our end. Please try again.');
+        }
+      }
+      return res;
+    }, function (err) {
+      if (isApi && method !== 'GET' && !isAssistant && app.classList.contains('show')) {
+        flash('Could not reach the server. Check your connection and try again.');
+      }
+      throw err;
+    });
+  };
 
   var firmSettings = { name: null, min_fee: null, batch_size: null };
 
@@ -2961,6 +3017,7 @@
     body.querySelectorAll('.ask-suggest button').forEach(function (b) {
       b.addEventListener('click', function () { sendAsk(b.getAttribute('data-q')); });
     });
+    document.getElementById('askSend').disabled = askState.busy;
   }
 
   async function sendAsk(text) {
