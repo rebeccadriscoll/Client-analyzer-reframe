@@ -97,6 +97,32 @@ rules still run on the output (no em/en dashes; none of the banned words).
 
 Set it up with an `ANTHROPIC_API_KEY` secret on the Worker (from console.anthropic.com).
 
+## Ask (in-app assistant)
+
+An **Ask** button (bottom-right, once signed in) opens a chat where the owner talks to
+their book in plain English. It runs **Claude** through a server-side tool-use loop
+(`ASSISTANT_MODEL`, falls back to `DRAFT_MODEL`, default Haiku) so nobody has to leave the
+app or set up an external connector. The whole thing lives behind `POST /api/assistant`
+(`{ messages }`, text only), which returns `{ reply, actions, ready }`.
+
+Claude answers by calling firm-scoped tools, never by guessing:
+
+- `get_summary` — book size, tier mix, decisions made, committed and potential revenue,
+  who is silent.
+- `list_clients` — filter by tier, decided action, or response state.
+- `find_client` — one client's full detail by (partial) name.
+- `set_response` — record that a client agreed / declined / was told / went silent; an
+  agree locks in the committed fee automatically.
+- `add_note` — jot a private note on a client.
+
+Every tool reads and writes only through the same firm-scoped D1 helpers the rest of the
+app uses, so the assistant can never touch another firm's data. The two write tools are
+surfaced back to the UI as small chips ("✓ Acme, agreed, $4,000 locked in") and trigger a
+refresh of the dashboard and client list. Nothing here sends email or contacts a client.
+The house voice rules (no em/en dashes; none of the banned words) are baked into the
+system prompt. Without an `ANTHROPIC_API_KEY`, the assistant returns a friendly "not
+switched on yet" message and makes no external calls.
+
 ## Guided decisions (Step 3)
 
 Clients sort by realized rate (lowest first, where the raise/let-go calls usually are)
@@ -166,6 +192,7 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/rollout` | GET | Waves, tracker rows, and committed/potential totals |
 | `/api/waves` | POST | Set a wave's send date + status (`{ type, send_date?, status }`) |
 | `/api/commitments` | POST | Owner sets a client's state (`{ client_id, state }`) |
+| `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
 
@@ -250,6 +277,7 @@ boundary-crm/
     email.ts            Brevo adapter with a dev fallback
     scoring.ts          realized rate, A-D tiering, numeric parsing
     words.ts            message templates + voice guardrail + optional LLM
+    assistant.ts        in-app Claude assistant: firm-scoped tool-use loop
     rollout.ts          wave order/labels + proposed-fee logic
     commit_page.ts      public commitment confirm page (HTML)
     import/
