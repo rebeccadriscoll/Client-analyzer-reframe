@@ -31,7 +31,7 @@ import type { Action, WaveType, WaveStatus, CommitmentState } from "./types";
 import { generateWords } from "./words";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
-import { sendMagicLink } from "./email";
+import { sendMagicLink, sendClientMessage } from "./email";
 import { SpreadsheetImporter } from "./import/importer";
 import { suggestMapping, refineWithLLM, CLIENT_FIELDS } from "./import/mapping";
 import { realizedRate, computeTiers, parseNumeric } from "./scoring";
@@ -93,6 +93,9 @@ export default {
       }
       if (pathname === "/api/voice/teach" && request.method === "POST") {
         return await handleVoiceTeach(request, env);
+      }
+      if (pathname === "/api/words/send" && request.method === "POST") {
+        return await handleWordsSend(request, env);
       }
       if (pathname === "/api/rollout" && request.method === "GET") {
         return await handleRollout(request, env);
@@ -264,6 +267,7 @@ async function handleImportCommit(request: Request, env: Env): Promise<Response>
     const est_hours = parseNumeric(cell(row, "est_hours"));
     staged.push({
       name,
+      email: emptyToNull(cell(row, "email")),
       entity_type: emptyToNull(cell(row, "entity_type")),
       return_type: emptyToNull(cell(row, "return_type")),
       annual_fee,
@@ -390,6 +394,38 @@ async function handleVoiceTeach(request: Request, env: Env): Promise<Response> {
   await addVoiceSample(env, firm.id, decision.action, b.message);
   const count = await countVoiceSamples(env, firm.id);
   return json({ ok: true, count, ready: count > 0 && !!env.ANTHROPIC_API_KEY });
+}
+
+/** POST /api/words/send { client_id } — email the saved message to the client
+ *  with their confirm link, and mark them told. */
+async function handleWordsSend(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  if (!env.BREVO_API_KEY) return json({ error: "email_not_configured" }, 400);
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "bad_request" }, 400);
+  }
+  const clientId = (body as { client_id?: unknown }).client_id;
+  if (typeof clientId !== "string") return json({ error: "bad_request" }, 400);
+
+  const client = await getClient(env, firm.id, clientId);
+  if (!client) return json({ error: "not_found" }, 404);
+  if (!client.email) return json({ error: "no_email" }, 400);
+  const decision = await getDecisionForClient(env, firm.id, clientId);
+  if (!decision) return json({ error: "no_decision" }, 400);
+  if (!decision.drafted_message) return json({ error: "no_message" }, 400);
+
+  // Ensure a commitment (and link) exists, and mark the client told.
+  const commitment = await upsertCommitment(env, firm.id, clientId, { state: "told" });
+  const base = (env.APP_URL || new URL(request.url).origin).replace(/\/$/, "");
+  const link = `${base}/c/${commitment.link_token}`;
+
+  await sendClientMessage(env, client.email, decision.action, decision.drafted_message, link);
+  return json({ ok: true, commitment });
 }
 
 /** POST /api/words/save { client_id, message } — persist the final message. */
