@@ -206,6 +206,73 @@ export async function insertClients(env: Env, firmId: string, news: NewClient[])
   return rows;
 }
 
+/** A realistic demo book (varied fees/hours so tiers spread A-D). */
+const SAMPLE_CLIENTS: Array<Omit<NewClient, "realized_rate" | "tier"> & { entity_type: string; return_type: string }> = [
+  { name: "Summit Dental", email: "office@summitdental.example.com", entity_type: "S-Corp", return_type: "1120-S", annual_fee: 6800, est_hours: 17 },
+  { name: "Rivera Landscaping", email: "ana@riveralandscaping.example.com", entity_type: "LLC", return_type: "1065", annual_fee: 5200, est_hours: 16 },
+  { name: "Blue Harbor Cafe", email: "hello@blueharborcafe.example.com", entity_type: "LLC", return_type: "1065", annual_fee: 4200, est_hours: 14 },
+  { name: "Nguyen Family Trust", email: "trust@nguyenfamily.example.com", entity_type: "Trust", return_type: "1041", annual_fee: 3600, est_hours: 14 },
+  { name: "Keystone Realty", email: "admin@keystonerealty.example.com", entity_type: "S-Corp", return_type: "1120-S", annual_fee: 3000, est_hours: 15 },
+  { name: "Orchard Pediatrics", email: "billing@orchardpeds.example.com", entity_type: "S-Corp", return_type: "1120-S", annual_fee: 3800, est_hours: 20 },
+  { name: "Delgado Consulting", email: "sam@delgadoconsulting.example.com", entity_type: "Sole Prop", return_type: "Schedule C", annual_fee: 2200, est_hours: 14 },
+  { name: "Maple Street Bakery", email: "orders@maplestreetbakery.example.com", entity_type: "LLC", return_type: "1065", annual_fee: 1900, est_hours: 16 },
+  { name: "Harbor Freight Hauling", email: "dispatch@harborhauling.example.com", entity_type: "LLC", return_type: "1065", annual_fee: 1600, est_hours: 18 },
+  { name: "Pinewood Daycare", email: "care@pinewooddaycare.example.com", entity_type: "Sole Prop", return_type: "Schedule C", annual_fee: 1400, est_hours: 20 },
+  { name: "Ace Handyman", email: "jobs@acehandyman.example.com", entity_type: "Sole Prop", return_type: "Schedule C", annual_fee: 1100, est_hours: 22 },
+  { name: "Corner Laundromat", email: "owner@cornerlaundromat.example.com", entity_type: "LLC", return_type: "1065", annual_fee: 900, est_hours: 20 },
+];
+
+/** True if the firm has any clients at all. */
+export async function firmHasClients(env: Env, firmId: string): Promise<boolean> {
+  const row = await env.DB.prepare("SELECT 1 AS ok FROM client WHERE firm_id = ? LIMIT 1").bind(firmId).first<{ ok: number }>();
+  return row != null;
+}
+
+/** Load the demo book, tagged flags='sample' so it can be cleared cleanly. */
+export async function loadSampleClients(env: Env, firmId: string): Promise<Client[]> {
+  const now = Date.now();
+  const staged: NewClient[] = SAMPLE_CLIENTS.map((c) => ({
+    name: c.name,
+    email: c.email,
+    entity_type: c.entity_type,
+    return_type: c.return_type,
+    annual_fee: c.annual_fee,
+    est_hours: c.est_hours,
+    realized_rate: realizedRate(c.annual_fee, c.est_hours),
+    tier: null,
+  }));
+  const tiers = computeTiers(staged, (c) => c.realized_rate);
+  const stmts = staged.map((c, i) =>
+    env.DB.prepare(
+      `INSERT INTO client (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sample', ?)`
+    ).bind(
+      crypto.randomUUID(), firmId, c.name, c.email, c.entity_type, c.return_type,
+      c.annual_fee, c.est_hours, c.realized_rate, tiers[i], now
+    )
+  );
+  await env.DB.batch(stmts);
+  return listClients(env, firmId);
+}
+
+/** Remove only the sample clients (and anything hanging off them), then re-tier. */
+export async function clearSampleClients(env: Env, firmId: string): Promise<void> {
+  const rows = await env.DB.prepare("SELECT id FROM client WHERE firm_id = ? AND flags = 'sample'")
+    .bind(firmId)
+    .all<{ id: string }>();
+  const ids = (rows.results ?? []).map((r) => r.id);
+  if (ids.length === 0) return;
+  const stmts: D1PreparedStatement[] = [];
+  for (const id of ids) {
+    stmts.push(env.DB.prepare("DELETE FROM note WHERE client_id = ? AND firm_id = ?").bind(id, firmId));
+    stmts.push(env.DB.prepare("DELETE FROM commitment WHERE client_id = ? AND firm_id = ?").bind(id, firmId));
+    stmts.push(env.DB.prepare("DELETE FROM decision WHERE client_id = ? AND firm_id = ?").bind(id, firmId));
+    stmts.push(env.DB.prepare("DELETE FROM client WHERE id = ? AND firm_id = ?").bind(id, firmId));
+  }
+  await env.DB.batch(stmts);
+  await retierFirm(env, firmId);
+}
+
 /** All clients for a firm, best tier and highest realized rate first. */
 export async function listClients(env: Env, firmId: string): Promise<Client[]> {
   const res = await env.DB.prepare(

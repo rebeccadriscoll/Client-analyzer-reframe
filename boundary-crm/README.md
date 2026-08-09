@@ -171,6 +171,16 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
   Phase 0 ships only `SpreadsheetImporter`; QBO/TaxDome connectors implement the same
   interface later without touching mapping, tiering, or the write path.
 
+### Try it with sample data
+
+A brand-new firm can explore the whole flow before importing real clients. The Home
+welcome and the Import screen both offer **Explore with sample clients**, which loads a
+twelve-client demo book (`flags = 'sample'`) that spreads cleanly across the A–D tiers, so
+Decide, The Words, and Ask all have something to work with. A banner then sits above every
+tab with **Clear sample data**, which removes only the tagged rows (real clients and notes
+are untouched) and re-tiers. Loading is gated to an empty book, so it can never clobber a
+real one. No migration: the demo marker reuses the existing `flags` column.
+
 ### API
 
 | Route | Method | Purpose |
@@ -199,6 +209,8 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/rollout` | GET | Waves, tracker rows, and committed/potential totals |
 | `/api/waves` | POST | Set a wave's send date + status (`{ type, send_date?, status }`) |
 | `/api/commitments` | POST | Owner sets a client's state (`{ client_id, state }`) |
+| `/api/sample/load` | POST | Fill an empty book with demo clients to explore |
+| `/api/sample/clear` | POST | Remove just the demo clients |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
