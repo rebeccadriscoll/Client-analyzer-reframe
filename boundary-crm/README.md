@@ -196,6 +196,25 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
   D bottom 20%). Rows with no name are skipped; rows with no fee/hours import but stay
   unranked. Setting or changing the target re-tiers the whole book.
 
+## Groom for sale (the book as an asset)
+
+For the wave of owners nearing retirement, the book is the retirement asset, and a clean,
+high-realization, low-concentration book sells for a higher multiple than a bloated one.
+The **Groom for sale** module (`GET /api/valuation`, `src/valuation.ts`) puts a rough
+practice value on the book, ~a multiple of recurring revenue that moves with the book's
+health, and shows exactly what lifts it:
+
+- **Estimated value range** and the multiple (small firms trade near 0.6x to 1.3x annual
+  recurring fees; the heuristic rewards A/B share and realized rate over target, and
+  discounts D-tier drag and client concentration).
+- **Levers**: reduce client concentration (a top client over ~15% of revenue gets
+  discounted by buyers), lift or release the D tier, close the gap to your target rate,
+  and clean up missing fees/hours before diligence.
+
+It is a defensible estimate for grooming decisions, clearly labeled as not a formal
+appraisal. This is the single-firm seed of a succession story; a buyer-matching network is
+a possible later step.
+
 ## Decision factors and capacity
 
 Realized rate is not the whole story, so a client also carries two optional 1 (low) to 3
@@ -257,6 +276,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/sample/load` | POST | Fill an empty book with demo clients to explore |
 | `/api/sample/clear` | POST | Remove just the demo clients |
 | `/api/handoffs` | GET | Transition packets for every client being let go |
+| `/api/valuation` | GET | Practice-value estimate + grooming levers |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
@@ -344,6 +364,7 @@ boundary-crm/
     words.ts            message templates + voice guardrail + optional LLM
     assistant.ts        in-app Claude assistant: firm-scoped tool-use loop
     handoff.ts          transition-packet builder for goodbyes
+    valuation.ts        practice-value estimate + grooming levers
     rollout.ts          wave order/labels + proposed-fee logic
     commit_page.ts      public commitment confirm page (HTML)
     import/

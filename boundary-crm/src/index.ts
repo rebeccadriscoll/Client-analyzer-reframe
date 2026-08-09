@@ -44,6 +44,7 @@ import {
 import type { Action, WaveType, WaveStatus, CommitmentState } from "./types";
 import { generateWords } from "./words";
 import { buildHandoffPacket } from "./handoff";
+import { computeValuation } from "./valuation";
 import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
@@ -163,6 +164,9 @@ export default {
       }
       if (pathname === "/api/handoffs" && request.method === "GET") {
         return await handleHandoffs(request, env);
+      }
+      if (pathname === "/api/valuation" && request.method === "GET") {
+        return await handleValuation(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -634,6 +638,14 @@ async function handleHandoffs(request: Request, env: Env): Promise<Response> {
     .filter((c) => decByClient.get(c.id)?.action === "fire")
     .map((c) => buildHandoffPacket(firmName, c));
   return json({ packets, count: packets.length });
+}
+
+/** GET /api/valuation — a rough practice-value estimate + grooming levers. */
+async function handleValuation(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const clients = await listClients(env, firm.id);
+  return json(computeValuation(clients, firm.target_rate));
 }
 
 const ACTIONS: Action[] = ["keep", "raise", "fire", "nudge"];
