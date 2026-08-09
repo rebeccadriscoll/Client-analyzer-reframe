@@ -623,6 +623,66 @@
   .fear-verdict.warn { border-left-color: var(--coral-deep); background: rgba(196,69,54,0.05); }
   .fear-verdict b { font-weight: 700; }
   .fear-verdict .cut-names { font-size: 13px; color: var(--gray); margin-top: 8px; }
+
+  /* ===== HOME DASHBOARD ===== */
+  .next-card {
+    background: var(--navy); color: white; border-radius: 20px; padding: 24px 28px; margin-bottom: 22px;
+    display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap;
+    position: relative; overflow: hidden;
+  }
+  .next-card::before { content:''; position:absolute; top:-50px; right:-50px; width:180px; height:180px; background:var(--coral); opacity:0.18; border-radius:50%; }
+  .next-card .nc-label { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--yellow); margin-bottom: 6px; position: relative; z-index: 1; }
+  .next-card .nc-text { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; position: relative; z-index: 1; }
+  .next-card .btn { position: relative; z-index: 1; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+  @media (max-width: 720px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  .stat-tile { background: white; border-radius: 16px; padding: 20px; box-shadow: var(--shadow-sm); border: 1px solid rgba(31,58,61,0.08); }
+  .stat-tile .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gray); margin-bottom: 8px; }
+  .stat-tile .val { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700; color: var(--navy); line-height: 1.05; }
+  .stat-tile .sub { font-size: 12px; color: var(--gray); margin-top: 4px; }
+  .home-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .home-cols { grid-template-columns: 1fr; } }
+  .home-card { background: white; border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm); border: 1px solid rgba(31,58,61,0.08); }
+  .home-card h4 { font-family: 'Fraunces', serif; font-size: 17px; color: var(--navy); margin-bottom: 14px; }
+  .home-tier-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; color: var(--navy); }
+  .home-tier-row .bar { flex: 1; height: 8px; background: var(--cream-deep); border-radius: 100px; overflow: hidden; }
+  .home-tier-row .bar span { display: block; height: 100%; border-radius: 100px; }
+  .home-tier-row .cnt { width: 24px; text-align: right; font-weight: 600; color: var(--gray); }
+  .followup-line { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--navy); }
+  .followup-line.none { color: var(--gray); }
+
+  /* ===== MODAL (client detail) ===== */
+  .modal-overlay { display: none; position: fixed; inset: 0; z-index: 60; background: rgba(21,40,43,0.55); padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .modal-overlay.show { display: flex; align-items: flex-start; justify-content: center; }
+  .modal-card { background: var(--cream); border-radius: 22px; box-shadow: var(--shadow-lg); width: 100%; max-width: 560px; margin: auto; padding: 26px; }
+  .modal-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .modal-title { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; color: var(--navy); }
+  .modal-close { background: none; border: none; font-size: 22px; color: var(--gray); cursor: pointer; line-height: 1; padding: 4px; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+  .field-grid .full { grid-column: 1 / -1; }
+  .mfield label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray); margin-bottom: 5px; }
+  .mfield input { width: 100%; padding: 11px 12px; font-size: 15px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; }
+  .mfield input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .modal-meta { font-size: 13px; color: var(--gray); margin: 10px 0 4px; }
+  .modal-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+  .modal-actions .spacer { flex: 1; }
+  .btn-danger { background: none; border: 1px solid var(--gray-light); color: var(--tier-d); font-family: 'Inter'; font-weight: 600; font-size: 13px; padding: 9px 14px; border-radius: 100px; cursor: pointer; }
+  .btn-danger:hover { border-color: var(--tier-d); background: rgba(196,69,54,0.06); }
+
+  .notes-wrap { margin-top: 22px; border-top: 1px solid rgba(31,58,61,0.1); padding-top: 18px; }
+  .notes-wrap h5 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gray); margin-bottom: 12px; }
+  .note-add { display: flex; gap: 8px; margin-bottom: 14px; }
+  .note-add textarea { flex: 1; min-height: 44px; resize: vertical; padding: 10px 12px; font-family: 'Inter'; font-size: 14px; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; }
+  .note-add textarea:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .note-item { background: white; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid rgba(31,58,61,0.08); }
+  .note-item .body { font-size: 14px; color: var(--navy); line-height: 1.5; white-space: pre-wrap; }
+  .note-item .when { font-size: 11px; color: var(--gray); margin-top: 6px; }
+  .notes-empty { font-size: 13px; color: var(--gray); font-style: italic; }
+
+  .silent-badge { display: inline-block; font-size: 11px; font-weight: 700; color: var(--tier-c); background: rgba(232,155,91,0.16); padding: 3px 8px; border-radius: 100px; margin-left: 6px; }
+  table.ctable tbody tr.clickable { cursor: pointer; }
+  table.ctable tbody tr.clickable:hover td { background: rgba(245, 208, 97, 0.09); }
 </style>
 </head>
 <body>
@@ -683,7 +743,8 @@
       </div>
 
       <nav class="tabnav">
-        <button class="active" onclick="showTab('import', this)"><span class="num">①</span> Import</button>
+        <button class="active" onclick="showTab('home', this)"><span class="num">⌂</span> Home</button>
+        <button onclick="showTab('import', this)"><span class="num">①</span> Import</button>
         <button onclick="showTab('decide', this)"><span class="num">②</span> Decide</button>
         <button onclick="showTab('words', this)"><span class="num">③</span> The Words</button>
         <button onclick="showTab('rollout', this)"><span class="num">④</span> Rollout</button>
@@ -691,8 +752,50 @@
         <button onclick="showTab('fear', this)"><span class="num">⑥</span> Fear Killer</button>
       </nav>
 
+      <!-- 0. HOME -->
+      <div class="panel active" id="panel-home">
+        <div class="section-header">
+          <div>
+            <span class="section-num">Overview</span>
+            <div class="section-title">Your book at a glance</div>
+          </div>
+          <p class="section-help">Where things stand, and what to do next.</p>
+        </div>
+        <div id="homeEmpty" class="placeholder" style="display:none;">
+          <div class="icon">👋</div>
+          <h3>Welcome. Let's bring your clients in.</h3>
+          <p>Import your client list and the dashboard fills in: tiers, decisions, committed revenue, and your next step.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('import', document.querySelectorAll('.tabnav button')[1])">Go to import</button>
+        </div>
+        <div id="homeMain" style="display:none;">
+          <div class="next-card">
+            <div>
+              <div class="nc-label">Next step</div>
+              <div class="nc-text" id="nextText">—</div>
+            </div>
+            <button class="btn btn-primary" id="nextBtn">Take me there</button>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-tile"><div class="lbl">Clients</div><div class="val" id="stClients">0</div><div class="sub" id="stDecided">0 decided</div></div>
+            <div class="stat-tile"><div class="lbl">Committed revenue</div><div class="val" id="stCommitted">$0</div><div class="sub" id="stPotential">of $0 on the table</div></div>
+            <div class="stat-tile"><div class="lbl">Book revenue</div><div class="val" id="stBook">$0</div><div class="sub">current annual fees</div></div>
+            <div class="stat-tile"><div class="lbl">Needs follow-up</div><div class="val" id="stSilent">0</div><div class="sub">silent 7+ days</div></div>
+          </div>
+          <div class="home-cols">
+            <div class="home-card">
+              <h4>Tier mix</h4>
+              <div id="homeTiers"></div>
+            </div>
+            <div class="home-card">
+              <h4>Decisions</h4>
+              <div id="homeDecisions"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 1. IMPORT -->
-      <div class="panel active" id="panel-import">
+      <div class="panel" id="panel-import">
         <div class="section-header">
           <div>
             <span class="section-num">Section 01</span>
@@ -726,6 +829,7 @@
           </div>
           <div class="btn-row">
             <button class="btn btn-secondary" id="importMoreBtn">Import another file</button>
+            <button class="btn btn-secondary" id="addClientBtn">Add a client</button>
           </div>
         </div>
 
@@ -973,6 +1077,39 @@
     </div>
   </div>
 
+  <!-- ============ CLIENT DETAIL MODAL ============ -->
+  <div class="modal-overlay" id="clientModal">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-title" id="cmTitle">Client</div>
+        <button class="modal-close" id="cmClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="field-grid">
+        <div class="mfield full"><label>Client name</label><input id="cmName" type="text" /></div>
+        <div class="mfield full"><label>Email</label><input id="cmEmail" type="email" inputmode="email" placeholder="client@example.com" /></div>
+        <div class="mfield"><label>Entity type</label><input id="cmEntity" type="text" placeholder="LLC, S-Corp…" /></div>
+        <div class="mfield"><label>Return type</label><input id="cmReturn" type="text" placeholder="1120-S, 1040…" /></div>
+        <div class="mfield"><label>Annual fee</label><input id="cmFee" type="text" inputmode="numeric" placeholder="0" /></div>
+        <div class="mfield"><label>Estimated hours</label><input id="cmHours" type="text" inputmode="numeric" placeholder="0" /></div>
+      </div>
+      <div class="modal-meta" id="cmMeta"></div>
+      <div class="modal-actions">
+        <button class="btn-danger" id="cmDelete">Delete client</button>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" id="cmCancel">Cancel</button>
+        <button class="btn btn-primary" id="cmSave">Save</button>
+      </div>
+      <div class="notes-wrap" id="cmNotesWrap">
+        <h5>Notes &amp; history</h5>
+        <div class="note-add">
+          <textarea id="cmNoteInput" placeholder="Add a note… (a call, context, what was said)"></textarea>
+          <button class="btn btn-secondary" id="cmNoteAdd">Add</button>
+        </div>
+        <div id="cmNotes"></div>
+      </div>
+    </div>
+  </div>
+
 <script>
   // ---- tab switching ----
   function showTab(id, btn) {
@@ -984,7 +1121,9 @@
     if (id === 'words') loadWords();
     if (id === 'rollout' || id === 'tracker') loadRollout();
     if (id === 'fear') loadFear();
+    if (id === 'home') loadOverview();
   }
+  var TAB_INDEX = { home: 0, import: 1, decide: 2, words: 3, rollout: 4, tracker: 5, fear: 6 };
 
   // ---- auth flow ----
   var gate = document.getElementById('gate');
@@ -1018,6 +1157,7 @@
       document.getElementById('whoEmail').textContent = email;
     }
     loadClients();
+    loadOverview();
   }
 
   function showError(msg) {
@@ -1150,8 +1290,10 @@
   }
 
   function renderClientRows(tbody, clients) {
+    imp.pfById = {};
+    clients.forEach(function (c) { imp.pfById[c.id] = c; });
     tbody.innerHTML = clients.map(function (c) {
-      return '<tr>' +
+      return '<tr class="clickable" data-cid="' + c.id + '">' +
         '<td class="center">' + tierBadge(c.tier) + '</td>' +
         '<td>' + esc(c.name) + '</td>' +
         '<td>' + esc(c.entity_type || '—') + '</td>' +
@@ -1979,12 +2121,17 @@
     var row = document.createElement('div');
     row.className = 'track-row';
     var feeTxt = t.action === 'fire' ? 'Goodbye' : ('Proposed ' + money(t.proposed_fee));
+    var silent = '';
+    if (t.state === 'told' && t.updated_at) {
+      var days = Math.floor((Date.now() - t.updated_at) / 86400000);
+      if (days >= 1) silent = '<span class="silent-badge">silent ' + days + 'd</span>';
+    }
     row.innerHTML =
       '<div class="track-who">' +
         tierBadge(t.client.tier) +
         '<span class="track-name">' + esc(t.client.name) + '</span>' +
         '<span class="word-badge ' + t.action + '">' + WORD_LABEL[t.action] + '</span>' +
-        '<span class="track-fee">' + feeTxt + '</span>' +
+        '<span class="track-fee">' + feeTxt + '</span>' + silent +
       '</div>' +
       '<div class="track-right">' +
         '<div class="state-pills">' + STATE_ORDER.map(function (s) {
@@ -2123,6 +2270,168 @@
 
   document.getElementById('cutSlider').addEventListener('input', computeFear);
   document.getElementById('minSlider').addEventListener('input', computeFear);
+
+  // ---- home dashboard (overview) ----
+  async function loadOverview() {
+    try {
+      var res = await fetch('/api/overview');
+      if (!res.ok) return;
+      renderOverview(await res.json());
+    } catch (e) { /* leave as-is */ }
+  }
+
+  function tierBar(label, n, total, color, labelWidth) {
+    var pct = total > 0 ? Math.round(n / total * 100) : 0;
+    return '<div class="home-tier-row"><span style="width:' + labelWidth + ';font-size:13px;color:var(--navy)">' + label + '</span>' +
+      '<div class="bar"><span style="width:' + pct + '%;background:' + color + '"></span></div>' +
+      '<span class="cnt">' + n + '</span></div>';
+  }
+
+  function renderOverview(d) {
+    var empty = document.getElementById('homeEmpty'), main = document.getElementById('homeMain');
+    if (!d.clients) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+    empty.style.display = 'none'; main.style.display = 'block';
+
+    document.getElementById('nextText').textContent = d.next.label;
+    document.getElementById('nextBtn').onclick = function () {
+      var idx = TAB_INDEX[d.next.tab] || 0;
+      showTab(d.next.tab, document.querySelectorAll('.tabnav button')[idx]);
+    };
+    document.getElementById('stClients').textContent = d.clients;
+    document.getElementById('stDecided').textContent = d.decided + ' decided · ' + d.undecided + ' to go';
+    document.getElementById('stCommitted').textContent = money(d.committed);
+    document.getElementById('stPotential').textContent = 'of ' + money(d.potential) + ' on the table';
+    document.getElementById('stBook').textContent = money(d.bookRevenue);
+    document.getElementById('stSilent').textContent = d.silent;
+
+    var tc = { A: 'var(--tier-a)', B: 'var(--tier-b)', C: 'var(--tier-c)', D: 'var(--tier-d)' };
+    var ht = ['A', 'B', 'C', 'D'].map(function (t) { return tierBar(t, d.tiers[t] || 0, d.clients, tc[t], '18px'); }).join('');
+    if (d.tiers.unranked) ht += tierBar('–', d.tiers.unranked, d.clients, 'var(--gray-light)', '18px');
+    document.getElementById('homeTiers').innerHTML = ht;
+
+    var ac = [['keep', 'Keep', 'var(--tier-a)'], ['raise', 'Raise', 'var(--tier-c)'], ['nudge', 'Nudge', 'var(--yellow)'], ['fire', 'Let go', 'var(--tier-d)']];
+    document.getElementById('homeDecisions').innerHTML = d.decided
+      ? ac.map(function (r) { return tierBar(r[1], d.actions[r[0]] || 0, d.decided, r[2], '52px'); }).join('')
+      : '<div class="notes-empty">No decisions yet.</div>';
+  }
+
+  // ---- client detail modal (edit / add / notes) ----
+  var cm = { id: null };
+
+  function openClientModal(client) {
+    cm.id = client ? client.id : null;
+    document.getElementById('cmTitle').textContent = client ? client.name : 'Add a client';
+    document.getElementById('cmName').value = client ? client.name : '';
+    document.getElementById('cmEmail').value = client && client.email ? client.email : '';
+    document.getElementById('cmEntity').value = client && client.entity_type ? client.entity_type : '';
+    document.getElementById('cmReturn').value = client && client.return_type ? client.return_type : '';
+    document.getElementById('cmFee').value = client && client.annual_fee != null ? client.annual_fee : '';
+    document.getElementById('cmHours').value = client && client.est_hours != null ? client.est_hours : '';
+    var meta = document.getElementById('cmMeta');
+    meta.textContent = client
+      ? ('Tier ' + (client.tier || '—') + ' · realized rate ' + (client.realized_rate != null ? '$' + Math.round(client.realized_rate) + '/hr' : '—'))
+      : '';
+    document.getElementById('cmDelete').style.display = client ? 'inline-block' : 'none';
+    document.getElementById('cmNotesWrap').style.display = client ? 'block' : 'none';
+    document.getElementById('cmNoteInput').value = '';
+    document.getElementById('cmSave').textContent = 'Save';
+    document.getElementById('cmSave').disabled = false;
+    if (client) loadNotes(client.id); else document.getElementById('cmNotes').innerHTML = '';
+    var ov = document.getElementById('clientModal');
+    ov.classList.add('show'); document.body.style.overflow = 'hidden';
+  }
+  function closeClientModal() {
+    document.getElementById('clientModal').classList.remove('show');
+    document.body.style.overflow = ''; cm.id = null;
+  }
+
+  function afterClientChange(data) {
+    if (data.clients) renderPortfolio(data.clients, countTiers(data.clients));
+    loadOverview();
+  }
+
+  async function saveClientModal() {
+    var payload = {
+      name: document.getElementById('cmName').value,
+      email: document.getElementById('cmEmail').value,
+      entity_type: document.getElementById('cmEntity').value,
+      return_type: document.getElementById('cmReturn').value,
+      annual_fee: document.getElementById('cmFee').value,
+      est_hours: document.getElementById('cmHours').value
+    };
+    if (!payload.name.trim()) { document.getElementById('cmName').focus(); return; }
+    var btn = document.getElementById('cmSave'); btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      if (cm.id) payload.id = cm.id;
+      var res = await fetch(cm.id ? '/api/clients/update' : '/api/clients/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      if (res.ok) { afterClientChange(await res.json()); closeClientModal(); }
+      else { btn.disabled = false; btn.textContent = 'Save'; }
+    } catch (e) { btn.disabled = false; btn.textContent = 'Save'; }
+  }
+
+  async function deleteClientModal() {
+    if (!cm.id) return;
+    if (!window.confirm('Delete this client? This also removes their decision, drafted message, and notes.')) return;
+    var btn = document.getElementById('cmDelete'); btn.disabled = true;
+    try {
+      var res = await fetch('/api/clients/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cm.id }) });
+      if (res.ok) { afterClientChange(await res.json()); closeClientModal(); }
+    } catch (e) { /* ignore */ }
+    btn.disabled = false;
+  }
+
+  function relTime(ts) {
+    var s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return 'just now';
+    var m = Math.floor(s / 60); if (m < 60) return m + ' min ago';
+    var h = Math.floor(m / 60); if (h < 24) return h + ' hr ago';
+    var dd = Math.floor(h / 24); if (dd < 30) return dd + ' day' + (dd === 1 ? '' : 's') + ' ago';
+    var mo = Math.floor(dd / 30); return mo + ' mo ago';
+  }
+
+  async function loadNotes(clientId) {
+    var el = document.getElementById('cmNotes');
+    el.innerHTML = '<div class="notes-empty">Loading…</div>';
+    try {
+      var res = await fetch('/api/notes/list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: clientId }) });
+      var data = await res.json().catch(function () { return {}; });
+      renderNotes(data.notes || []);
+    } catch (e) { el.innerHTML = ''; }
+  }
+  function renderNotes(notes) {
+    var el = document.getElementById('cmNotes');
+    if (!notes.length) { el.innerHTML = '<div class="notes-empty">No notes yet.</div>'; return; }
+    el.innerHTML = notes.map(function (n) {
+      return '<div class="note-item"><div class="body">' + esc(n.body) + '</div><div class="when">' + relTime(n.created_at) + '</div></div>';
+    }).join('');
+  }
+  async function addNoteModal() {
+    var input = document.getElementById('cmNoteInput');
+    var body = input.value.trim();
+    if (!body || !cm.id) return;
+    var btn = document.getElementById('cmNoteAdd'); btn.disabled = true;
+    try {
+      var res = await fetch('/api/notes/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: cm.id, body: body }) });
+      if (res.ok) { input.value = ''; loadNotes(cm.id); }
+    } catch (e) { /* ignore */ }
+    btn.disabled = false;
+  }
+
+  document.getElementById('cmClose').addEventListener('click', closeClientModal);
+  document.getElementById('cmCancel').addEventListener('click', closeClientModal);
+  document.getElementById('cmSave').addEventListener('click', saveClientModal);
+  document.getElementById('cmDelete').addEventListener('click', deleteClientModal);
+  document.getElementById('cmNoteAdd').addEventListener('click', addNoteModal);
+  document.getElementById('clientModal').addEventListener('click', function (e) { if (e.target === this) closeClientModal(); });
+  document.getElementById('addClientBtn').addEventListener('click', function () { openClientModal(null); });
+  document.querySelector('#pfTable tbody').addEventListener('click', function (e) {
+    var tr = e.target.closest ? e.target.closest('tr[data-cid]') : null;
+    if (!tr) return;
+    var c = imp.pfById && imp.pfById[tr.getAttribute('data-cid')];
+    if (c) openClientModal(c);
+  });
 
   checkSession();
 </script>
