@@ -683,6 +683,30 @@
   .silent-badge { display: inline-block; font-size: 11px; font-weight: 700; color: var(--tier-c); background: rgba(232,155,91,0.16); padding: 3px 8px; border-radius: 100px; margin-left: 6px; }
   table.ctable tbody tr.clickable { cursor: pointer; }
   table.ctable tbody tr.clickable:hover td { background: rgba(245, 208, 97, 0.09); }
+
+  /* ===== SETTINGS / SEASONS ===== */
+  .season-help { font-size: 13px; color: var(--gray); line-height: 1.5; margin-bottom: 12px; }
+  .season-label { flex: 1; padding: 10px 12px; font-size: 14px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; }
+  .season-label:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .btn-danger-solid { background: var(--tier-d); color: white; border: none; font-family: 'Inter'; font-weight: 600; font-size: 14px; padding: 10px 18px; border-radius: 100px; cursor: pointer; white-space: nowrap; }
+  .btn-danger-solid:hover { filter: brightness(1.05); }
+  .season-item { background: white; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid rgba(31,58,61,0.08); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .season-item .s-label { font-weight: 600; color: var(--navy); font-size: 14px; }
+  .season-item .s-when { font-size: 11px; color: var(--gray); }
+  .season-item .s-stats { font-size: 13px; color: var(--gray); }
+  .season-item .s-stats b { color: var(--navy); }
+
+  /* ===== PORTFOLIO TOOLBAR + SORT ===== */
+  .pf-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .pf-search { flex: 1; min-width: 180px; max-width: 320px; padding: 10px 14px; font-size: 14px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 100px; background: white; outline: none; }
+  .pf-search:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .pf-filter { display: inline-flex; background: white; border-radius: 100px; padding: 3px; border: 1px solid var(--gray-light); }
+  .pf-filter button { border: none; background: transparent; font-family: 'Inter'; font-size: 12px; font-weight: 600; color: var(--gray); padding: 6px 12px; border-radius: 100px; cursor: pointer; }
+  .pf-filter button.on { background: var(--navy); color: white; }
+  table.ctable th.sortable { cursor: pointer; user-select: none; }
+  table.ctable th.sortable:hover { color: var(--navy); }
+  table.ctable th .arr { opacity: 0.5; font-size: 9px; }
+  .pf-none { font-size: 14px; color: var(--gray); font-style: italic; padding: 16px; }
 </style>
 </head>
 <body>
@@ -726,11 +750,12 @@
             <div class="brand-mark">B</div>
             <div>
               <div class="brand-name">Boundary CRM</div>
-              <div class="brand-tag">Rebecca Driscoll, CPA</div>
+              <div class="brand-tag" id="brandTag">Your firm</div>
             </div>
           </div>
           <div class="header-right">
             <div class="who">Signed in as <b id="whoEmail"></b></div>
+            <button class="logout-btn" id="settingsBtn">Settings</button>
             <button class="logout-btn" id="logoutBtn">Sign out</button>
           </div>
         </div>
@@ -816,17 +841,32 @@
             </div>
             <div class="tier-chips" id="pfTiers"></div>
           </div>
+          <div class="pf-toolbar">
+            <input class="pf-search" id="pfSearch" type="search" placeholder="Search clients…" />
+            <div class="pf-filter" id="pfFilter">
+              <button data-tier="all" class="on">All</button>
+              <button data-tier="A">A</button>
+              <button data-tier="B">B</button>
+              <button data-tier="C">C</button>
+              <button data-tier="D">D</button>
+            </div>
+          </div>
           <div class="ctable-wrap">
             <table class="ctable" id="pfTable">
               <thead>
                 <tr>
-                  <th class="center">Tier</th><th>Client</th><th>Entity</th><th>Return</th>
-                  <th class="num">Annual fee</th><th class="num">Est. hours</th><th class="num">Realized rate</th>
+                  <th class="center sortable" data-key="tier">Tier <span class="arr"></span></th>
+                  <th class="sortable" data-key="name">Client <span class="arr"></span></th>
+                  <th>Entity</th><th>Return</th>
+                  <th class="num sortable" data-key="annual_fee">Annual fee <span class="arr"></span></th>
+                  <th class="num sortable" data-key="est_hours">Est. hours <span class="arr"></span></th>
+                  <th class="num sortable" data-key="realized_rate">Realized rate <span class="arr"></span></th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
+          <div class="pf-none" id="pfNone" style="display:none;">No clients match.</div>
           <div class="btn-row">
             <button class="btn btn-secondary" id="importMoreBtn">Import another file</button>
             <button class="btn btn-secondary" id="addClientBtn">Add a client</button>
@@ -1110,6 +1150,37 @@
     </div>
   </div>
 
+  <!-- ============ SETTINGS MODAL ============ -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-title">Settings</div>
+        <button class="modal-close" id="setClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="field-grid">
+        <div class="mfield full"><label>Firm name</label><input id="setName" type="text" placeholder="Your firm name" /></div>
+        <div class="mfield"><label>Minimum fee</label><input id="setMinFee" type="text" inputmode="numeric" placeholder="0" /></div>
+        <div class="mfield"><label>Default batch size</label><input id="setBatch" type="text" inputmode="numeric" placeholder="5" /></div>
+      </div>
+      <div class="modal-meta">The minimum fee floors your raise suggestions and the Fear Killer. Batch size sets how many clients you work at a time.</div>
+      <div class="modal-actions">
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" id="setCancel">Cancel</button>
+        <button class="btn btn-primary" id="setSave">Save</button>
+      </div>
+
+      <div class="notes-wrap">
+        <h5>Season</h5>
+        <p class="season-help">Closing a season snapshots this cycle (decisions and committed revenue) and clears it so you can start fresh next time. Your clients and notes stay.</p>
+        <div class="note-add">
+          <input id="seasonLabel" class="season-label" type="text" placeholder="e.g. Tax Season 2025" />
+          <button class="btn btn-danger-solid" id="seasonCloseBtn">Close season</button>
+        </div>
+        <div id="seasonList"></div>
+      </div>
+    </div>
+  </div>
+
 <script>
   // ---- tab switching ----
   function showTab(id, btn) {
@@ -1129,11 +1200,28 @@
   var gate = document.getElementById('gate');
   var app = document.getElementById('app');
 
+  var firmSettings = { name: null, min_fee: null, batch_size: null };
+
+  function applySettings(firm) {
+    if (!firm) return;
+    firmSettings.name = firm.name;
+    firmSettings.min_fee = firm.min_fee;
+    firmSettings.batch_size = firm.batch_size;
+    document.getElementById('brandTag').textContent = firm.name || 'Your firm';
+    if (firm.batch_size) {
+      var sel = document.getElementById('batchSize');
+      var has = Array.prototype.some.call(sel.options, function (o) { return parseInt(o.value, 10) === firm.batch_size; });
+      if (!has) { var o = document.createElement('option'); o.value = firm.batch_size; o.textContent = firm.batch_size + ' at a time'; sel.appendChild(o); }
+      sel.value = String(firm.batch_size);
+    }
+  }
+
   async function checkSession() {
     try {
       var res = await fetch('/api/me', { headers: { 'Accept': 'application/json' } });
       if (res.ok) {
         var data = await res.json();
+        applySettings(data.firm);
         showApp(data.firm && data.firm.email);
         return;
       }
@@ -1268,6 +1356,8 @@
     } catch (e) { /* stay on upload */ }
   }
 
+  var pfState = { search: '', tier: 'all', sortKey: 'tier', sortDir: 1 };
+
   function renderPortfolio(clients, tiers) {
     imp.hasClients = clients.length > 0;
     var pf = document.getElementById('portfolio');
@@ -1278,7 +1368,37 @@
     up.style.display = 'none';
     document.getElementById('pfCount').textContent = clients.length;
     renderTierChips(document.getElementById('pfTiers'), tiers);
-    renderClientRows(document.querySelector('#pfTable tbody'), clients);
+    imp.pfAll = clients;
+    imp.pfById = {};
+    clients.forEach(function (c) { imp.pfById[c.id] = c; });
+    renderPfTable();
+  }
+
+  var TIER_ORDER = { A: 0, B: 1, C: 2, D: 3 };
+  function renderPfTable() {
+    var list = (imp.pfAll || []).slice();
+    if (pfState.tier !== 'all') list = list.filter(function (c) { return c.tier === pfState.tier; });
+    if (pfState.search) {
+      var q = pfState.search.toLowerCase();
+      list = list.filter(function (c) { return (c.name || '').toLowerCase().indexOf(q) >= 0; });
+    }
+    var k = pfState.sortKey, dir = pfState.sortDir;
+    list.sort(function (a, b) {
+      var av, bv;
+      if (k === 'name') return a.name.localeCompare(b.name) * dir;
+      if (k === 'tier') { av = TIER_ORDER[a.tier] != null ? TIER_ORDER[a.tier] : 9; bv = TIER_ORDER[b.tier] != null ? TIER_ORDER[b.tier] : 9; return (av - bv) * dir; }
+      av = a[k]; bv = b[k];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * dir;
+    });
+    renderClientRows(document.querySelector('#pfTable tbody'), list);
+    document.getElementById('pfNone').style.display = list.length ? 'none' : 'block';
+    document.querySelectorAll('#pfTable th.sortable').forEach(function (th) {
+      var arr = th.querySelector('.arr');
+      arr.textContent = th.getAttribute('data-key') === k ? (dir === 1 ? '▲' : '▼') : '';
+    });
   }
 
   function renderTierChips(el, tiers) {
@@ -1290,8 +1410,6 @@
   }
 
   function renderClientRows(tbody, clients) {
-    imp.pfById = {};
-    clients.forEach(function (c) { imp.pfById[c.id] = c; });
     tbody.innerHTML = clients.map(function (c) {
       return '<tr class="clickable" data-cid="' + c.id + '">' +
         '<td class="center">' + tierBadge(c.tier) + '</td>' +
@@ -1531,12 +1649,13 @@
   }
 
   function suggestFee(c, avg) {
-    if (c.est_hours && avg > 0) {
-      var f = Math.ceil(avg * c.est_hours / 50) * 50;
-      return Math.max(f, c.annual_fee != null ? c.annual_fee : 0) || f;
-    }
-    if (c.annual_fee != null) return Math.round(c.annual_fee * 1.2 / 50) * 50;
-    return null;
+    var floor = firmSettings.min_fee || 0;
+    var f = null;
+    if (c.est_hours && avg > 0) f = Math.ceil(avg * c.est_hours / 50) * 50;
+    else if (c.annual_fee != null) f = Math.round(c.annual_fee * 1.2 / 50) * 50;
+    else if (floor) f = floor;
+    if (f == null) return null;
+    return Math.max(f, floor, c.annual_fee != null ? c.annual_fee : 0);
   }
 
   async function loadDecide() {
@@ -2216,6 +2335,7 @@
     var maxFee = fear.clients.reduce(function (m, c) { return Math.max(m, c.annual_fee || 0); }, 0);
     var minS = document.getElementById('minSlider');
     minS.max = Math.max(Math.ceil(maxFee / 500) * 500, 1000);
+    if (firmSettings.min_fee) minS.value = Math.min(firmSettings.min_fee, minS.max);
 
     computeFear();
   }
@@ -2431,6 +2551,93 @@
     if (!tr) return;
     var c = imp.pfById && imp.pfById[tr.getAttribute('data-cid')];
     if (c) openClientModal(c);
+  });
+
+  // ---- settings + seasons ----
+  function fmtDate(ts) { try { return new Date(ts).toLocaleDateString(); } catch (e) { return ''; } }
+
+  function openSettings() {
+    document.getElementById('setName').value = firmSettings.name || '';
+    document.getElementById('setMinFee').value = firmSettings.min_fee != null ? firmSettings.min_fee : '';
+    document.getElementById('setBatch').value = firmSettings.batch_size != null ? firmSettings.batch_size : '';
+    document.getElementById('seasonLabel').value = '';
+    loadSeasons();
+    var ov = document.getElementById('settingsModal');
+    ov.classList.add('show'); document.body.style.overflow = 'hidden';
+  }
+  function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); document.body.style.overflow = ''; }
+
+  async function saveSettings() {
+    var payload = {
+      name: document.getElementById('setName').value,
+      min_fee: document.getElementById('setMinFee').value,
+      batch_size: document.getElementById('setBatch').value
+    };
+    var btn = document.getElementById('setSave'); btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      var res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (res.ok) { applySettings((await res.json()).firm); closeSettings(); }
+    } catch (e) { /* ignore */ }
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+
+  async function loadSeasons() {
+    try {
+      var res = await fetch('/api/seasons');
+      if (!res.ok) return;
+      renderSeasons((await res.json()).seasons || []);
+    } catch (e) { /* ignore */ }
+  }
+  function renderSeasons(seasons) {
+    var el = document.getElementById('seasonList');
+    if (!seasons.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray);margin:16px 0 8px;">Past seasons</div>' +
+      seasons.map(function (s) {
+        return '<div class="season-item"><div><div class="s-label">' + esc(s.label) + '</div>' +
+          '<div class="s-when">closed ' + fmtDate(s.closed_at) + '</div></div>' +
+          '<div class="s-stats"><b>' + s.decided + '</b> decided · <b>' + money(s.committed) + '</b> committed</div></div>';
+      }).join('');
+  }
+
+  async function closeSeasonAction() {
+    var label = document.getElementById('seasonLabel').value.trim() || 'Season';
+    if (!window.confirm('Close "' + label + '"?\n\nThis snapshots your decisions and committed revenue, then clears them so you can start fresh. Your clients and notes stay.')) return;
+    var btn = document.getElementById('seasonCloseBtn'); btn.disabled = true; btn.textContent = 'Closing…';
+    try {
+      var res = await fetch('/api/seasons/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: label }) });
+      if (res.ok) {
+        document.getElementById('seasonLabel').value = '';
+        loadSeasons();
+        loadOverview();
+        loadClients();
+      }
+    } catch (e) { /* ignore */ }
+    btn.disabled = false; btn.textContent = 'Close season';
+  }
+
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('setClose').addEventListener('click', closeSettings);
+  document.getElementById('setCancel').addEventListener('click', closeSettings);
+  document.getElementById('setSave').addEventListener('click', saveSettings);
+  document.getElementById('seasonCloseBtn').addEventListener('click', closeSeasonAction);
+  document.getElementById('settingsModal').addEventListener('click', function (e) { if (e.target === this) closeSettings(); });
+
+  // ---- portfolio search / filter / sort ----
+  document.getElementById('pfSearch').addEventListener('input', function () { pfState.search = this.value.trim(); renderPfTable(); });
+  document.getElementById('pfFilter').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-tier]') : null;
+    if (!b) return;
+    pfState.tier = b.getAttribute('data-tier');
+    this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    renderPfTable();
+  });
+  document.querySelectorAll('#pfTable th.sortable').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var k = th.getAttribute('data-key');
+      if (pfState.sortKey === k) pfState.sortDir = -pfState.sortDir;
+      else { pfState.sortKey = k; pfState.sortDir = (k === 'name' || k === 'tier') ? 1 : -1; }
+      renderPfTable();
+    });
   });
 
   checkSession();

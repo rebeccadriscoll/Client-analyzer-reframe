@@ -21,7 +21,11 @@ All six Phase 0 sections are now built.
 
 Phase 1 also adds a **Home dashboard** (overview + suggested next step), **edit/add clients**
 (a detail modal that re-tiers the book on any change), **notes & history** per client, and
-**follow-up flags** for clients told-but-silent.
+**follow-up flags** for clients told-but-silent. Plus **Settings** (firm name shown in the
+header, a minimum fee that floors raise suggestions + the Fear Killer, and a default batch
+size), **portfolio search / tier-filter / column sort**, and **Seasons** — closing a season
+snapshots the cycle's decisions and committed revenue, then clears them (clients and notes
+stay) so you start fresh next tax season.
 
 ## Fear Killer (Step 6)
 
@@ -149,6 +153,9 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
 | `/api/words/save` | POST | Save the final message (`{ client_id, message }`) |
 | `/api/words/handoff` | POST | Mint the confirm link + mark told, for the owner to send (`{ client_id }`) |
 | `/api/overview` | GET | Dashboard aggregates + suggested next step |
+| `/api/settings` | GET/POST | Firm name, minimum fee, default batch size |
+| `/api/seasons` | GET | Past closed seasons |
+| `/api/seasons/close` | POST | Snapshot the cycle + clear it (`{ label }`) |
 | `/api/clients/create` | POST | Add a client by hand (re-tiers the book) |
 | `/api/clients/update` | POST | Edit a client's fields (re-tiers the book) |
 | `/api/clients/delete` | POST | Delete a client + its decision/notes (re-tiers) |
@@ -233,7 +240,7 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth … 0006 client email; 0007 note)
+  migrations/           D1 schema (0001 auth … 0007 note; 0008 settings + season)
   src/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)

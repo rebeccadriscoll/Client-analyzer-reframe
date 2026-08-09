@@ -1,6 +1,6 @@
 import type {
   Env, Firm, Client, Tier, Action, Decision,
-  Wave, WaveType, WaveStatus, Commitment, CommitmentState, VoiceSample, Note,
+  Wave, WaveType, WaveStatus, Commitment, CommitmentState, VoiceSample, Note, Season,
 } from "./types";
 import { randomToken, sha256Hex } from "./crypto";
 import { realizedRate, computeTiers } from "./scoring";
@@ -25,6 +25,8 @@ export async function getOrCreateFirm(env: Env, rawEmail: string): Promise<Firm>
     owner_email: email,
     name: null,
     created_at: Date.now(),
+    min_fee: null,
+    batch_size: null,
   };
   await env.DB.prepare(
     "INSERT INTO firm (id, owner_email, name, created_at) VALUES (?, ?, ?, ?)"
@@ -32,6 +34,59 @@ export async function getOrCreateFirm(env: Env, rawEmail: string): Promise<Firm>
     .bind(firm.id, firm.owner_email, firm.name, firm.created_at)
     .run();
   return firm;
+}
+
+/** Update firm-level settings. */
+export async function updateSettings(
+  env: Env,
+  firmId: string,
+  s: { name: string | null; min_fee: number | null; batch_size: number | null }
+): Promise<Firm> {
+  await env.DB.prepare("UPDATE firm SET name = ?, min_fee = ?, batch_size = ? WHERE id = ?")
+    .bind(s.name, s.min_fee, s.batch_size, firmId)
+    .run();
+  const row = await env.DB.prepare("SELECT * FROM firm WHERE id = ?").bind(firmId).first<Firm>();
+  return row!;
+}
+
+// ---- seasons ----
+
+export async function listSeasons(env: Env, firmId: string): Promise<Season[]> {
+  const res = await env.DB.prepare("SELECT * FROM season WHERE firm_id = ? ORDER BY closed_at DESC")
+    .bind(firmId)
+    .all<Season>();
+  return res.results ?? [];
+}
+
+/** Snapshot the current cycle as a season, then clear decisions + commitments. */
+export async function closeSeason(
+  env: Env,
+  firmId: string,
+  snapshot: { label: string; decided: number; committed: number; potential: number; tiers: unknown; actions: unknown }
+): Promise<Season> {
+  const season: Season = {
+    id: crypto.randomUUID(),
+    firm_id: firmId,
+    label: snapshot.label,
+    decided: snapshot.decided,
+    committed: snapshot.committed,
+    potential: snapshot.potential,
+    tiers: JSON.stringify(snapshot.tiers),
+    actions: JSON.stringify(snapshot.actions),
+    closed_at: Date.now(),
+  };
+  await env.DB.prepare(
+    `INSERT INTO season (id, firm_id, label, decided, committed, potential, tiers, actions, closed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(season.id, firmId, season.label, season.decided, season.committed, season.potential, season.tiers, season.actions, season.closed_at)
+    .run();
+  // Clear the current cycle (clients + notes stay).
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM commitment WHERE firm_id = ?").bind(firmId),
+    env.DB.prepare("DELETE FROM decision WHERE firm_id = ?").bind(firmId),
+  ]);
+  return season;
 }
 
 /** Issue a single-use magic-link token, returning the raw value (only the hash is stored). */
