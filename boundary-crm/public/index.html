@@ -2909,7 +2909,7 @@
   var askState = { messages: [], busy: false, open: false, greeted: false };
   var ASK_SUGGESTIONS = [
     'Give me a summary of my book',
-    'Which A-tier clients have not agreed yet?',
+    'Which of my D-tier clients should I raise?',
     'Who has gone silent?',
     'What should I do next?'
   ];
@@ -2934,7 +2934,8 @@
     var html = '';
     if (askState.messages.length === 0) {
       html += '<div class="ask-intro">Hi. I can look across your clients and answer in plain English. ' +
-        'I can also mark who agreed or declined and jot a note, when you ask. Try one of these:</div>';
+        'When you ask, I can also record a decision, draft the message, mark who agreed or declined, and jot ' +
+        'a note. Nothing gets sent without you. Try one of these:</div>';
       html += '<div class="ask-suggest">';
       ASK_SUGGESTIONS.forEach(function (s) {
         html += '<button type="button" data-q="' + esc(s) + '">' + esc(s) + '</button>';
@@ -2946,7 +2947,8 @@
         if (m.role === 'assistant' && m.actions && m.actions.length) {
           html += '<div class="ask-chips">';
           m.actions.forEach(function (a) {
-            var label = (a.type === 'set_response' ? '✓ ' : '✎ ') + esc(a.client) + ' — ' + esc(a.detail);
+            var icons = { set_response: '✓', add_note: '✎', set_decision: '◆', draft_message: '✍' };
+            var label = (icons[a.type] || '•') + ' ' + esc(a.client) + ' — ' + esc(a.detail);
             html += '<span class="ask-chip">' + label + '</span>';
           });
           html += '</div>';
@@ -2987,6 +2989,8 @@
           loadOverview();
           loadClients();
           if (typeof loadRollout === 'function') loadRollout();
+          if (typeof loadDecide === 'function') loadDecide();
+          if (typeof loadWords === 'function') loadWords();
         }
       }
     } catch (e) {

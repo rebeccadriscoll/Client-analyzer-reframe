@@ -111,14 +111,21 @@ Claude answers by calling firm-scoped tools, never by guessing:
   who is silent.
 - `list_clients` — filter by tier, decided action, or response state.
 - `find_client` — one client's full detail by (partial) name.
+- `set_decision` — record the call for a client (keep / raise / nudge / fire). A raise
+  without an explicit fee gets a suggested one, computed the same way the Decide tab does
+  (lift to the book's average realized rate, floored by the firm minimum).
+- `draft_message` — write and save the client-facing message for a decided client, in the
+  owner's learned voice when samples exist, so it lands in The Words for review.
 - `set_response` — record that a client agreed / declined / was told / went silent; an
   agree locks in the committed fee automatically.
 - `add_note` — jot a private note on a client.
 
 Every tool reads and writes only through the same firm-scoped D1 helpers the rest of the
-app uses, so the assistant can never touch another firm's data. The two write tools are
-surfaced back to the UI as small chips ("✓ Acme, agreed, $4,000 locked in") and trigger a
-refresh of the dashboard and client list. Nothing here sends email or contacts a client.
+app uses, so the assistant can never touch another firm's data. The write tools are
+surfaced back to the UI as small chips ("✓ Acme, agreed, $4,000 locked in", "◆ Bwinkle,
+raise to $2,100 (suggested)") and trigger a refresh of the dashboard, client list, Decide,
+and The Words. Nothing here sends email or contacts a client; drafting only saves a
+message for the owner to review and send.
 The house voice rules (no em/en dashes; none of the banned words) are baked into the
 system prompt. Without an `ANTHROPIC_API_KEY`, the assistant returns a friendly "not
 switched on yet" message and makes no external calls.

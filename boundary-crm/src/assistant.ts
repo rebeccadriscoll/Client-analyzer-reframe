@@ -4,14 +4,18 @@ import {
   getDecisions,
   getCommitments,
   getDecisionForClient,
+  upsertDecision,
+  setDraftedMessage,
   upsertCommitment,
   addNote,
+  getVoiceSamples,
 } from "./db";
 import { proposedFee } from "./rollout";
+import { generateWords } from "./words";
 
 /** One thing the assistant did, surfaced to the UI as a chip. */
 export interface AssistantAction {
-  type: "set_response" | "add_note";
+  type: "set_response" | "add_note" | "set_decision" | "draft_message";
   client: string;
   detail: string;
 }
@@ -65,6 +69,30 @@ const TOOLS = [
     },
   },
   {
+    name: "set_decision",
+    description:
+      "Record the owner's decision for a client: keep (no change), raise (higher fee), nudge (small changes to fix the fit, fee unchanged), or fire (part ways). For a raise you may pass new_fee; if you leave it out on a raise, a suggested fee is computed from the book's average realized rate. This only records the call. It does not send anything.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        action: { type: "string", enum: ACTIONS },
+        new_fee: { type: "number", description: "The new annual fee for a raise. Optional." },
+      },
+      required: ["name", "action"],
+    },
+  },
+  {
+    name: "draft_message",
+    description:
+      "Write the client-facing message for a client who already has a decision. Uses the owner's learned voice when samples exist, follows the house voice rules, and saves the draft so it appears in The Words. Returns the drafted text. The owner still reviews and sends it themselves.",
+    input_schema: {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    },
+  },
+  {
     name: "set_response",
     description:
       "Record how a client responded to their message. state must be one of: agreed (they accepted), declined (they said no), told (message sent, awaiting reply), silent (no reply yet). When a client agrees, their committed fee is locked in automatically.",
@@ -101,12 +129,15 @@ function systemPrompt(firm: Firm): string {
     `sorted into tiers A through D. The owner decides an action for each client: keep (no change), raise ` +
     `(higher fee), nudge (small changes to fix the fit), or fire (part ways). Then they send each client a ` +
     `message and track who agreed, declined, or has gone silent.\n\n` +
-    `Your job: answer the owner's questions about their book and, when they ask, update records for them. ` +
-    `Use the tools to read real data before answering. Never invent client names, fees, or numbers. If you ` +
-    `are not sure which client they mean, ask.\n\n` +
-    `Before you change anything (a response state or a note), make sure the owner actually asked for that ` +
-    `change. Nothing you do sends an email or contacts a client. After you make a change, say plainly what ` +
-    `you did.\n\n` +
+    `Your job: answer the owner's questions about their book and, when they ask, do the work with them. You ` +
+    `can record a decision for a client (keep, raise, nudge, fire), draft the client-facing message, record ` +
+    `how a client responded, and jot notes. Use the tools to read real data before answering. Never invent ` +
+    `client names, fees, or numbers. If you are not sure which client they mean, ask.\n\n` +
+    `When the owner asks you to decide or draft, you may suggest the call and explain your reasoning from the ` +
+    `numbers (realized rate, tier, hours), but record a decision only when they have asked for it. Before you ` +
+    `change anything, make sure the owner actually asked for that change. Nothing you do sends an email or ` +
+    `contacts a client. Drafting only saves a message for the owner to review and send. After you make a ` +
+    `change, say plainly what you did.\n\n` +
     `Voice rules for everything you write: warm, plain, and short. No em dashes or en dashes anywhere. Never ` +
     `use the words honestly, quietly, genuinely, or straightforward. Money in whole dollars.`
   );
@@ -115,6 +146,22 @@ function systemPrompt(firm: Firm): string {
 function money(n: number | null | undefined): string {
   if (n == null) return "n/a";
   return "$" + Math.round(n).toLocaleString("en-US");
+}
+
+/**
+ * Suggested raise fee, mirroring the Decide UI: lift the client to the book's
+ * average realized rate (rounded up to the nearest $50), else bump the current
+ * fee 20%, never below the firm minimum or the client's current fee.
+ */
+function suggestRaiseFee(client: Client, all: Client[], minFee: number): number | null {
+  const rates = all.map((c) => c.realized_rate).filter((v): v is number => v != null);
+  const avg = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
+  let f: number | null = null;
+  if (client.est_hours && avg > 0) f = Math.ceil((avg * client.est_hours) / 50) * 50;
+  else if (client.annual_fee != null) f = Math.round((client.annual_fee * 1.2) / 50) * 50;
+  else if (minFee) f = minFee;
+  if (f == null) return null;
+  return Math.max(f, minFee || 0, client.annual_fee ?? 0);
 }
 
 /** Resolve a name to clients: exact (case-insensitive) first, else substring. */
@@ -319,6 +366,53 @@ async function runTool(
       })
     );
     return { found: true, clients: detailed };
+  }
+
+  if (name === "set_decision") {
+    const action = String(input.action ?? "");
+    if (!ACTIONS.includes(action as Action)) {
+      return { ok: false, message: `action must be one of ${ACTIONS.join(", ")}.` };
+    }
+    const matches = matchClients(clients, String(input.name ?? ""));
+    if (matches.length === 0) return { ok: false, message: "No client by that name." };
+    if (matches.length > 1) return { ok: false, ambiguous: true, names: matches.map((c) => c.name) };
+    const client = matches[0];
+
+    let newFee: number | null = null;
+    let suggested = false;
+    if (action === "raise") {
+      const given = typeof input.new_fee === "number" && input.new_fee > 0 ? input.new_fee : null;
+      if (given != null) {
+        newFee = Math.round(given);
+      } else {
+        newFee = suggestRaiseFee(client, clients, firm.min_fee ?? 0);
+        suggested = newFee != null;
+      }
+    }
+    await upsertDecision(env, firm.id, { client_id: client.id, action: action as Action, new_fee: newFee });
+    const detail =
+      action === "raise"
+        ? `raise${newFee != null ? " to " + money(newFee) : ""}${suggested ? " (suggested)" : ""}`
+        : action;
+    actions.push({ type: "set_decision", client: client.name, detail });
+    return { ok: true, client: client.name, action, new_fee: newFee, fee_suggested: suggested };
+  }
+
+  if (name === "draft_message") {
+    const matches = matchClients(clients, String(input.name ?? ""));
+    if (matches.length === 0) return { ok: false, message: "No client by that name." };
+    if (matches.length > 1) return { ok: false, ambiguous: true, names: matches.map((c) => c.name) };
+    const client = matches[0];
+    const decision = await getDecisionForClient(env, firm.id, client.id);
+    if (!decision) {
+      return { ok: false, message: "This client has no decision yet. Decide keep, raise, nudge, or fire first." };
+    }
+    const samples = await getVoiceSamples(env, firm.id);
+    const message = await generateWords(env, client, decision, samples);
+    await setDraftedMessage(env, firm.id, client.id, message);
+    const inVoice = samples.length > 0 && !!env.ANTHROPIC_API_KEY;
+    actions.push({ type: "draft_message", client: client.name, detail: `drafted${inVoice ? " in your voice" : ""}` });
+    return { ok: true, client: client.name, action: decision.action, in_voice: inVoice, message };
   }
 
   if (name === "set_response") {
