@@ -29,6 +29,15 @@ stay) so you start fresh next tax season. The Home tab also has a first-run
 **getting-started checklist**, a **printable summary report**, and a **CSV export** of the
 book.
 
+### Season trends
+
+Each close now also snapshots book health (gross revenue, weighted realized rate, client
+count), and the Home tab shows a **Season trends** card once seasons exist: clients,
+realized rate, committed revenue, and decisions across closed seasons, oldest to newest,
+with up/down deltas so you can see whether the book is actually improving year over year
+(e.g. realized rate $173/hr → $202/hr after a raise cycle). Past seasons closed before this
+change show a dash for the new metrics.
+
 ## Fear Killer (Step 6)
 
 A live calculator over your imported clients, no saving involved. Two sliders:
@@ -447,7 +456,7 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth … 0009 target rate + risk/relationship; 0010 members + invites)
+  migrations/           D1 schema (0001 auth … 0009 target rate + risk/relationship; 0010 members + invites; 0011 season metrics)
   src/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)

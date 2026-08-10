@@ -150,7 +150,11 @@ export async function listSeasons(env: Env, firmId: string): Promise<Season[]> {
 export async function closeSeason(
   env: Env,
   firmId: string,
-  snapshot: { label: string; decided: number; committed: number; potential: number; tiers: unknown; actions: unknown }
+  snapshot: {
+    label: string; decided: number; committed: number; potential: number;
+    tiers: unknown; actions: unknown;
+    gross_revenue: number; book_rate: number | null; clients: number;
+  }
 ): Promise<Season> {
   const season: Season = {
     id: crypto.randomUUID(),
@@ -161,13 +165,17 @@ export async function closeSeason(
     potential: snapshot.potential,
     tiers: JSON.stringify(snapshot.tiers),
     actions: JSON.stringify(snapshot.actions),
+    gross_revenue: snapshot.gross_revenue,
+    book_rate: snapshot.book_rate,
+    clients: snapshot.clients,
     closed_at: Date.now(),
   };
   await env.DB.prepare(
-    `INSERT INTO season (id, firm_id, label, decided, committed, potential, tiers, actions, closed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO season (id, firm_id, label, decided, committed, potential, tiers, actions, gross_revenue, book_rate, clients, closed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
-    .bind(season.id, firmId, season.label, season.decided, season.committed, season.potential, season.tiers, season.actions, season.closed_at)
+    .bind(season.id, firmId, season.label, season.decided, season.committed, season.potential, season.tiers, season.actions,
+      season.gross_revenue, season.book_rate, season.clients, season.closed_at)
     .run();
   // Clear the current cycle (clients + notes stay).
   await env.DB.batch([
