@@ -745,6 +745,8 @@
   .pf-filter { display: inline-flex; background: white; border-radius: 100px; padding: 3px; border: 1px solid var(--gray-light); }
   .pf-filter button { border: none; background: transparent; font-family: 'Inter'; font-size: 12px; font-weight: 600; color: var(--gray); padding: 6px 12px; border-radius: 100px; cursor: pointer; }
   .pf-filter button.on { background: var(--navy); color: white; }
+  .pf-mine { border: 1px solid var(--gray-light); background: white; font-family: 'Inter'; font-size: 12px; font-weight: 600; color: var(--gray); padding: 7px 14px; border-radius: 100px; cursor: pointer; }
+  .pf-mine.on { background: var(--coral); color: white; border-color: var(--coral); }
   table.ctable th.sortable { cursor: pointer; user-select: none; }
   table.ctable th.sortable:hover { color: var(--navy); }
   table.ctable th .arr { opacity: 0.5; font-size: 9px; }
@@ -1126,6 +1128,7 @@
               <button data-tier="C">C</button>
               <button data-tier="D">D</button>
             </div>
+            <button class="pf-mine" id="pfMine" type="button" style="display:none;">Mine</button>
           </div>
           <div class="ctable-wrap">
             <table class="ctable" id="pfTable">
@@ -1513,6 +1516,8 @@
           <select id="cmRisk"><option value="">Not set</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option></select></div>
         <div class="mfield"><label>Relationship <span class="lbl-hint">value beyond the fee</span></label>
           <select id="cmRel"><option value="">Not set</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option></select></div>
+        <div class="mfield full" id="cmOwnerWrap" style="display:none;"><label>Managed by</label>
+          <select id="cmOwner"><option value="">Unassigned</option></select></div>
       </div>
       <div class="modal-meta" id="cmMeta"></div>
       <div class="modal-actions">
@@ -1683,6 +1688,31 @@
   };
 
   var firmSettings = { name: null, min_fee: null, batch_size: null, target_rate: null, role: null };
+  var firmTeam = { members: [], meId: null };
+
+  // Cache the firm's members so the client card can tag "managed by" and the
+  // portfolio can filter to "mine". Only meaningful once there is more than one.
+  async function loadTeamCache() {
+    try {
+      var res = await fetch('/api/team');
+      if (!res.ok) return;
+      var d = await res.json();
+      firmTeam.members = d.members || [];
+      firmTeam.meId = d.me ? d.me.id : null;
+      applyTeamVisibility();
+    } catch (e) { /* ignore */ }
+  }
+  function applyTeamVisibility() {
+    var multi = firmTeam.members.length > 1;
+    var wrap = document.getElementById('cmOwnerWrap');
+    var mine = document.getElementById('pfMine');
+    if (wrap) wrap.style.display = multi ? 'block' : 'none';
+    if (mine) mine.style.display = multi ? 'inline-block' : 'none';
+  }
+  function memberEmail(id) {
+    var m = firmTeam.members.find(function (x) { return x.id === id; });
+    return m ? m.email : null;
+  }
 
   function applySettings(firm) {
     if (!firm) return;
@@ -1733,6 +1763,7 @@
     document.getElementById('askFab').classList.remove('hidden');
     loadClients();
     loadOverview();
+    loadTeamCache();
   }
 
   function showError(msg) {
@@ -1875,7 +1906,7 @@
     } catch (e) { /* wrapper flashes on failure */ }
   }
 
-  var pfState = { search: '', tier: 'all', sortKey: 'tier', sortDir: 1 };
+  var pfState = { search: '', tier: 'all', mine: false, sortKey: 'tier', sortDir: 1 };
 
   function renderPortfolio(clients, tiers) {
     imp.hasClients = clients.length > 0;
@@ -1897,6 +1928,7 @@
   function renderPfTable() {
     var list = (imp.pfAll || []).slice();
     if (pfState.tier !== 'all') list = list.filter(function (c) { return c.tier === pfState.tier; });
+    if (pfState.mine && firmTeam.meId) list = list.filter(function (c) { return c.owner_member_id === firmTeam.meId; });
     if (pfState.search) {
       var q = pfState.search.toLowerCase();
       list = list.filter(function (c) { return (c.name || '').toLowerCase().indexOf(q) >= 0; });
@@ -3369,6 +3401,12 @@
     document.getElementById('cmHours').value = client && client.est_hours != null ? client.est_hours : '';
     document.getElementById('cmRisk').value = client && client.risk_level != null ? String(client.risk_level) : '';
     document.getElementById('cmRel').value = client && client.relationship_level != null ? String(client.relationship_level) : '';
+    var ownerSel = document.getElementById('cmOwner');
+    ownerSel.innerHTML = '<option value="">Unassigned</option>' + firmTeam.members.map(function (m) {
+      return '<option value="' + m.id + '">' + esc(m.email) + (m.id === firmTeam.meId ? ' (you)' : '') + '</option>';
+    }).join('');
+    ownerSel.value = client && client.owner_member_id ? client.owner_member_id : '';
+    applyTeamVisibility();
     var meta = document.getElementById('cmMeta');
     meta.textContent = client
       ? ('Tier ' + (client.tier || '—') + ' · realized rate ' + (client.realized_rate != null ? '$' + Math.round(client.realized_rate) + '/hr' : '—'))
@@ -3401,7 +3439,8 @@
       annual_fee: document.getElementById('cmFee').value,
       est_hours: document.getElementById('cmHours').value,
       risk_level: document.getElementById('cmRisk').value || null,
-      relationship_level: document.getElementById('cmRel').value || null
+      relationship_level: document.getElementById('cmRel').value || null,
+      owner_member_id: document.getElementById('cmOwner').value || null
     };
     if (!payload.name.trim()) { document.getElementById('cmName').focus(); return; }
     var btn = document.getElementById('cmSave'); btn.disabled = true; btn.textContent = 'Saving…';
@@ -3533,6 +3572,9 @@
     }[code] || 'Could not send that invite.';
   }
   function renderTeam(d) {
+    firmTeam.members = d.members || [];
+    firmTeam.meId = d.me ? d.me.id : null;
+    applyTeamVisibility();
     var isOwner = d.me.role === 'owner';
     document.getElementById('teamInviteRow').style.display = isOwner ? 'flex' : 'none';
     var html = d.members.map(function (m) {
@@ -3625,6 +3667,11 @@
     if (!b) return;
     pfState.tier = b.getAttribute('data-tier');
     this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    renderPfTable();
+  });
+  document.getElementById('pfMine').addEventListener('click', function () {
+    pfState.mine = !pfState.mine;
+    this.classList.toggle('on', pfState.mine);
     renderPfTable();
   });
   document.querySelectorAll('#pfTable th.sortable').forEach(function (th) {

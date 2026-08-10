@@ -259,6 +259,7 @@ function firmPayload(firm: Firm, member: Member) {
   return {
     email: member.email,
     role: member.role,
+    member_id: member.id,
     name: firm.name,
     min_fee: firm.min_fee,
     batch_size: firm.batch_size,
@@ -318,6 +319,7 @@ function parseClientFields(b: Record<string, unknown>): ClientFields | null {
     est_hours: num(b.est_hours),
     risk_level: lvl(b.risk_level),
     relationship_level: lvl(b.relationship_level),
+    owner_member_id: typeof b.owner_member_id === "string" && b.owner_member_id.trim() !== "" ? b.owner_member_id.trim() : null,
   };
 }
 
