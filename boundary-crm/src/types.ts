@@ -129,6 +129,8 @@ export interface Firm {
   batch_size: number | null;
   /** Target realized rate ($/hr). When set, tiers grade against it absolutely. */
   target_rate: number | null;
+  /** 1 if the firm contributes anonymized fees to the benchmark network. */
+  contribute_benchmarks: number | null;
 }
 
 export interface Season {

@@ -29,6 +29,7 @@ export async function getOrCreateFirm(env: Env, rawEmail: string): Promise<Firm>
     min_fee: null,
     batch_size: null,
     target_rate: null,
+    contribute_benchmarks: null,
   };
   await env.DB.prepare(
     "INSERT INTO firm (id, owner_email, name, created_at) VALUES (?, ?, ?, ?)"
@@ -120,13 +121,25 @@ export async function removeMember(env: Env, firmId: string, memberId: string): 
 export async function updateSettings(
   env: Env,
   firmId: string,
-  s: { name: string | null; min_fee: number | null; batch_size: number | null; target_rate: number | null }
+  s: { name: string | null; min_fee: number | null; batch_size: number | null; target_rate: number | null; contribute_benchmarks: number | null }
 ): Promise<Firm> {
-  await env.DB.prepare("UPDATE firm SET name = ?, min_fee = ?, batch_size = ?, target_rate = ? WHERE id = ?")
-    .bind(s.name, s.min_fee, s.batch_size, s.target_rate, firmId)
+  await env.DB.prepare("UPDATE firm SET name = ?, min_fee = ?, batch_size = ?, target_rate = ?, contribute_benchmarks = ? WHERE id = ?")
+    .bind(s.name, s.min_fee, s.batch_size, s.target_rate, s.contribute_benchmarks, firmId)
     .run();
   const row = await env.DB.prepare("SELECT * FROM firm WHERE id = ?").bind(firmId).first<Firm>();
   return row!;
+}
+
+/** Anonymized fees from every firm that has opted into the benchmark network. */
+export async function getContributedFees(
+  env: Env
+): Promise<Array<{ entity_type: string | null; return_type: string | null; annual_fee: number; firm_id: string }>> {
+  const res = await env.DB.prepare(
+    `SELECT c.entity_type, c.return_type, c.annual_fee, c.firm_id
+     FROM client c JOIN firm f ON f.id = c.firm_id
+     WHERE f.contribute_benchmarks = 1 AND c.annual_fee IS NOT NULL AND c.annual_fee > 0`
+  ).all<{ entity_type: string | null; return_type: string | null; annual_fee: number; firm_id: string }>();
+  return res.results ?? [];
 }
 
 /** The firm's target realized rate, or null. Used to grade tiers absolutely. */

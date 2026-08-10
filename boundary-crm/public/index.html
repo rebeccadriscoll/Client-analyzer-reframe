@@ -982,6 +982,17 @@
   .team-role.invited { background: #FFF6DC; color: #9A7B12; }
   .team-err { font-size: 13px; color: #B4362B; margin: 4px 0; min-height: 0; }
   .team-err:empty { display: none; }
+  .set-contribute { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; font-size: 13px; color: var(--navy); line-height: 1.5; cursor: pointer; }
+  .set-contribute input { margin-top: 3px; flex: 0 0 auto; }
+  .set-contribute b { color: var(--navy); }
+
+  /* ===== NETWORK BENCHMARKS ===== */
+  .net-card { background: white; border: 1px solid var(--gray-light); border-radius: 16px; padding: 20px 22px; margin-bottom: 20px; }
+  .net-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .net-head h4 { font-family: 'Fraunces', serif; font-size: 18px; color: var(--navy); }
+  .net-sub { font-size: 13px; color: var(--gray); margin-bottom: 12px; }
+  .net-nudge { font-size: 13px; color: var(--gray); background: #FFF6DC; border: 1px dashed var(--yellow); border-radius: 12px; padding: 12px 14px; }
+  .net-nudge b { color: #9A7B12; }
 </style>
 </head>
 <body>
@@ -1489,6 +1500,10 @@
         </div>
         <div id="benchMain" style="display:none;">
           <div class="bench-summary" id="benchSummary"></div>
+          <div class="net-card" id="netCard" style="display:none;">
+            <div class="net-head"><h4>Network benchmarks</h4><span class="net-sub" id="netSub"></span></div>
+            <div id="netBody"></div>
+          </div>
           <div class="ctable-wrap">
             <table class="ctable" id="benchTable">
               <thead><tr><th>Client</th><th>Service</th><th class="num">Your fee</th><th class="num">Typical range</th><th>Status</th><th class="num">To market</th></tr></thead>
@@ -1627,6 +1642,7 @@
         <div class="mfield"><label>Default batch size</label><input id="setBatch" type="text" inputmode="numeric" placeholder="5" /></div>
       </div>
       <div class="modal-meta">Your target realized rate is what an hour of your work should earn. Set it and tiers grade against it, so D means genuinely below target, not just the bottom of your book. The minimum fee floors your raise suggestions and the Fear Killer. Batch size sets how many clients you work at a time.</div>
+      <label class="set-contribute"><input type="checkbox" id="setContribute" /> <span><b>Contribute to the benchmark network.</b> Share your fees, anonymized and aggregate only, to unlock what firms like yours charge per service. Only pooled percentiles are ever shown, never a client or a firm.</span></label>
       <div class="modal-actions">
         <span class="spacer"></span>
         <button class="btn btn-ghost" id="setCancel">Cancel</button>
@@ -1763,7 +1779,7 @@
     });
   };
 
-  var firmSettings = { name: null, min_fee: null, batch_size: null, target_rate: null, role: null };
+  var firmSettings = { name: null, min_fee: null, batch_size: null, target_rate: null, role: null, contribute_benchmarks: 0 };
   var firmTeam = { members: [], meId: null };
 
   // Cache the firm's members so the client card can tag "managed by" and the
@@ -1797,6 +1813,7 @@
     firmSettings.batch_size = firm.batch_size;
     firmSettings.target_rate = firm.target_rate;
     firmSettings.role = firm.role;
+    firmSettings.contribute_benchmarks = firm.contribute_benchmarks;
     document.getElementById('brandTag').textContent = firm.name || 'Your firm';
     if (firm.batch_size) {
       var sel = document.getElementById('batchSize');
@@ -3634,10 +3651,36 @@
       renderBench(await res.json());
     } catch (e) { /* leave as-is */ }
   }
+  function renderNetwork(d) {
+    var card = document.getElementById('netCard');
+    var body = document.getElementById('netBody');
+    var sub = document.getElementById('netSub');
+    var net = d.network || [];
+    var mine = {};
+    (d.rows || []).forEach(function (r) { if (!mine[r.service]) mine[r.service] = { sum: 0, n: 0 }; mine[r.service].sum += r.fee; mine[r.service].n++; });
+    card.style.display = 'block';
+    if (!net.length) {
+      sub.textContent = '';
+      body.innerHTML = '<div class="net-nudge">' + (d.contributing
+        ? '<b>Sharing is on.</b> Not enough pooled data for your services yet. As more firms contribute, network benchmarks for each service appear here.'
+        : '<b>Unlock network benchmarks.</b> Turn on benchmark sharing in Settings to help build what firms like yours actually charge per service. Anonymized and aggregate only.') + '</div>';
+      return;
+    }
+    sub.textContent = 'What contributing firms actually charge, pooled and anonymized.';
+    var rows = net.map(function (n) {
+      var m = mine[n.label];
+      var yours = (m && m.n) ? money(Math.round(m.sum / m.n)) : '—';
+      return '<tr><td>' + esc(n.label) + '</td><td class="num">' + yours + '</td><td class="num">' + money(n.median) + '</td><td class="num">' + money(n.p25) + ' – ' + money(n.p75) + '</td><td class="num">' + n.firms + '</td></tr>';
+    }).join('');
+    body.innerHTML = '<div class="ctable-wrap"><table class="ctable"><thead><tr><th>Service</th><th class="num">Your average</th><th class="num">Network median</th><th class="num">Typical (25–75%)</th><th class="num">Firms</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      (d.contributing ? '' : '<div class="net-nudge" style="margin-top:12px;"><b>You are viewing shared data.</b> Turn on benchmark sharing in Settings to contribute your own fees too.</div>');
+  }
+
   function renderBench(d) {
     var empty = document.getElementById('benchEmpty'), main = document.getElementById('benchMain');
     if (!d.clients) { empty.style.display = 'block'; main.style.display = 'none'; return; }
     empty.style.display = 'none'; main.style.display = 'block';
+    renderNetwork(d);
     var s = d.summary;
     document.getElementById('benchSummary').innerHTML =
       '<div class="bench-tile headroom"><div class="bt-val">' + money(s.headroom) + '</div><div class="bt-lbl">raise headroom to market low</div></div>' +
@@ -3806,6 +3849,7 @@
     document.getElementById('setTarget').value = firmSettings.target_rate != null ? firmSettings.target_rate : '';
     document.getElementById('setMinFee').value = firmSettings.min_fee != null ? firmSettings.min_fee : '';
     document.getElementById('setBatch').value = firmSettings.batch_size != null ? firmSettings.batch_size : '';
+    document.getElementById('setContribute').checked = !!firmSettings.contribute_benchmarks;
     document.getElementById('seasonLabel').value = '';
     document.getElementById('teamErr').textContent = '';
     document.getElementById('teamEmail').value = '';
@@ -3821,7 +3865,8 @@
       name: document.getElementById('setName').value,
       target_rate: document.getElementById('setTarget').value,
       min_fee: document.getElementById('setMinFee').value,
-      batch_size: document.getElementById('setBatch').value
+      batch_size: document.getElementById('setBatch').value,
+      contribute_benchmarks: document.getElementById('setContribute').checked
     };
     var btn = document.getElementById('setSave'); btn.disabled = true; btn.textContent = 'Saving…';
     try {
