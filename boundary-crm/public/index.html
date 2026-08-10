@@ -918,6 +918,20 @@
   .gc-script { margin-top: 10px; display: none; }
   .gc-script.show { display: block; }
   .gc-script textarea { width: 100%; min-height: 150px; resize: vertical; border: 1px solid var(--gray-light); border-radius: 10px; padding: 11px 13px; font-family: 'Inter'; font-size: 14px; line-height: 1.5; color: var(--ink); background: var(--cream); }
+
+  /* ===== BENCHMARKS ===== */
+  .bench-summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .bench-tile { background: white; border: 1px solid var(--gray-light); border-radius: 16px; padding: 18px 20px; flex: 1 1 200px; }
+  .bench-tile .bt-val { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1.05; }
+  .bench-tile .bt-lbl { font-size: 13px; color: var(--gray); margin-top: 4px; }
+  .bench-tile.headroom { background: var(--navy); border-color: var(--navy); }
+  .bench-tile.headroom .bt-val { color: white; }
+  .bench-tile.headroom .bt-lbl { color: rgba(255,255,255,0.75); }
+  .bstatus { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; text-transform: capitalize; }
+  .bstatus.below { background: var(--coral-soft); color: var(--coral-deep); }
+  .bstatus.within { background: rgba(45,106,107,0.12); color: var(--teal); }
+  .bstatus.above { background: var(--cream-deep); color: var(--gray); }
+  #benchTable td.gap { color: var(--coral-deep); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -1004,6 +1018,7 @@
         <button onclick="showTab('fear', this)"><span class="num">⑥</span> Fear Killer</button>
         <button onclick="showTab('grow', this)"><span class="num">↑</span> Grow</button>
         <button onclick="showTab('groom', this)"><span class="num">$</span> Groom for sale</button>
+        <button onclick="showTab('bench', this)"><span class="num">≈</span> Benchmarks</button>
       </nav>
 
       <div class="sample-banner" id="sampleBanner" style="display:none;">
@@ -1367,6 +1382,33 @@
         </div>
       </div>
 
+      <!-- 9. BENCHMARKS -->
+      <div class="panel" id="panel-bench">
+        <div class="section-header">
+          <div>
+            <span class="section-num">Benchmarks</span>
+            <div class="section-title">Where your fees sit vs the market</div>
+          </div>
+          <p class="section-help">Fees below the typical range for the service are raise candidates the rate view can miss.</p>
+        </div>
+        <div id="benchEmpty" class="placeholder" style="display:none;">
+          <div class="icon">📊</div>
+          <h3>Import your clients first</h3>
+          <p>Once your book is in, this compares each client's fee to a market range for their service and flags the underpriced ones.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('import', document.querySelectorAll('.tabnav button')[1])">Go to import</button>
+        </div>
+        <div id="benchMain" style="display:none;">
+          <div class="bench-summary" id="benchSummary"></div>
+          <div class="ctable-wrap">
+            <table class="ctable" id="benchTable">
+              <thead><tr><th>Client</th><th>Service</th><th class="num">Your fee</th><th class="num">Typical range</th><th>Status</th><th class="num">To market</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="val-note">General US small-firm ranges, a starting reference and not gospel. Local market, complexity, and scope all move the number. Aggregated benchmarks from real firms can replace these later.</p>
+        </div>
+      </div>
+
       <footer>
         <div>Boundary CRM · Phase 0 preview</div>
         <div>Free on-ramp: <a href="/" onclick="return false;">The Client Analyzer</a></div>
@@ -1564,8 +1606,9 @@
     if (id === 'home') loadOverview();
     if (id === 'grow') loadGrow();
     if (id === 'groom') loadGroom();
+    if (id === 'bench') loadBench();
   }
-  var TAB_INDEX = { home: 0, import: 1, decide: 2, words: 3, rollout: 4, tracker: 5, fear: 6, grow: 7, groom: 8 };
+  var TAB_INDEX = { home: 0, import: 1, decide: 2, words: 3, rollout: 4, tracker: 5, fear: 6, grow: 7, groom: 8, bench: 9 };
 
   // ---- auth flow ----
   var gate = document.getElementById('gate');
@@ -3245,6 +3288,41 @@
   }
   document.getElementById('npHours').addEventListener('input', renderProspect);
   document.getElementById('npFee').addEventListener('input', renderProspect);
+
+  // ---- benchmarks (fees vs market) ----
+  async function loadBench() {
+    try {
+      var res = await fetch('/api/benchmarks');
+      if (!res.ok) return;
+      renderBench(await res.json());
+    } catch (e) { /* leave as-is */ }
+  }
+  function renderBench(d) {
+    var empty = document.getElementById('benchEmpty'), main = document.getElementById('benchMain');
+    if (!d.clients) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+    empty.style.display = 'none'; main.style.display = 'block';
+    var s = d.summary;
+    document.getElementById('benchSummary').innerHTML =
+      '<div class="bench-tile headroom"><div class="bt-val">' + money(s.headroom) + '</div><div class="bt-lbl">raise headroom to market low</div></div>' +
+      '<div class="bench-tile"><div class="bt-val">' + s.below + '</div><div class="bt-lbl">priced below market</div></div>' +
+      '<div class="bench-tile"><div class="bt-val">' + s.within + '</div><div class="bt-lbl">within range</div></div>' +
+      '<div class="bench-tile"><div class="bt-val">' + s.above + '</div><div class="bt-lbl">above range</div></div>';
+    var tb = document.querySelector('#benchTable tbody');
+    if (!d.rows.length) {
+      tb.innerHTML = '<tr><td colspan="6" class="pf-none">No clients matched a known service type yet. Set entity or return type on your clients to benchmark them.</td></tr>';
+      return;
+    }
+    tb.innerHTML = d.rows.map(function (r) {
+      return '<tr>' +
+        '<td>' + esc(r.name) + '</td>' +
+        '<td>' + esc(r.service) + '</td>' +
+        '<td class="num">' + money(r.fee) + '</td>' +
+        '<td class="num">' + money(r.low) + ' – ' + money(r.high) + '</td>' +
+        '<td><span class="bstatus ' + r.status + '">' + r.status + '</span></td>' +
+        '<td class="num' + (r.gap ? ' gap' : '') + '">' + (r.gap ? '+' + money(r.gap) : '—') + '</td>' +
+        '</tr>';
+    }).join('');
+  }
 
   document.getElementById('reportBtn').addEventListener('click', printReport);
   document.getElementById('exportBtn').addEventListener('click', exportCsv);

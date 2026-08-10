@@ -196,6 +196,22 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
   D bottom 20%). Rows with no name are skipped; rows with no fee/hours import but stay
   unranked. Setting or changing the target re-tiers the whole book.
 
+## Benchmarks (fees vs the market)
+
+Realized rate tells you if a client is profitable *for the hours*; benchmarks tell you if
+the *fee* is right for the service. `GET /api/benchmarks` (`src/benchmarks.ts`) maps each
+client to a service band from its entity/return type and compares the fee to a typical
+range:
+
+- A summary (raise **headroom** to lift every below-market client to its range low, plus
+  below / within / above counts) and a table sorted with the underpriced clients first.
+- The ranges are **general US small-firm defaults**, clearly labeled as a starting
+  reference, not gospel. They are the seed for real aggregated benchmarks once enough firms
+  are on the platform, which is the kind of data accountants pay for.
+
+Below-market clients are raise candidates the rate view alone can miss (a client can have
+a fine realized rate and still be underpriced against the market).
+
 ## Grow, not just cut
 
 The profession's whole strategic push is up-market, from commodity compliance to advisory,
@@ -296,6 +312,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/handoffs` | GET | Transition packets for every client being let go |
 | `/api/valuation` | GET | Practice-value estimate + grooming levers |
 | `/api/grow` | GET | Advisory-upsell candidates + new-prospect pricing inputs |
+| `/api/benchmarks` | GET | Each client's fee vs a market range for its service |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
@@ -385,6 +402,7 @@ boundary-crm/
     handoff.ts          transition-packet builder for goodbyes
     valuation.ts        practice-value estimate + grooming levers
     grow.ts             advisory-upsell candidates + outreach scripts
+    benchmarks.ts       fee-vs-market service bands + comparison
     rollout.ts          wave order/labels + proposed-fee logic
     commit_page.ts      public commitment confirm page (HTML)
     import/
