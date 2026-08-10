@@ -705,7 +705,7 @@
   .tier-note { font-size: 12px; color: var(--gray); margin-bottom: 12px; margin-top: -4px; }
   .mfield select { width: 100%; padding: 11px 12px; font-size: 15px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; cursor: pointer; }
   .mfield select:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
-  .mfield label .lbl-hint { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray); margin-left: 4px; }
+  .mfield label .lbl-hint, .np-field label .lbl-hint { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray); margin-left: 4px; }
   .modal-meta { font-size: 13px; color: var(--gray); margin: 10px 0 4px; }
   .modal-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
   .modal-actions .spacer { flex: 1; }
@@ -891,6 +891,33 @@
   .lever-body .lv-title { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
   .lever-body .lv-detail { font-size: 13px; color: var(--gray); line-height: 1.5; }
   .lever-none { font-size: 14px; color: var(--gray); font-style: italic; }
+
+  /* ===== GROW ===== */
+  .np-help { font-size: 13px; color: var(--gray); margin-bottom: 14px; }
+  .np-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .np-field { flex: 1 1 180px; }
+  .np-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray); margin-bottom: 5px; }
+  .np-field input { width: 100%; padding: 11px 12px; font-size: 15px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; }
+  .np-field input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .np-out { margin-top: 16px; font-size: 15px; color: var(--navy); line-height: 1.6; min-height: 24px; }
+  .np-out .big { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; color: var(--navy); }
+  .np-out .verdict { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 100px; }
+  .np-out .verdict.good { background: rgba(45,106,107,0.12); color: var(--teal); }
+  .np-out .verdict.warn { background: var(--coral-soft); color: var(--coral-deep); }
+  .grow-cands { margin-top: 24px; }
+  .grow-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .grow-head h4 { font-family: 'Fraunces', serif; font-size: 18px; color: var(--navy); }
+  .grow-sub { font-size: 13px; color: var(--gray); }
+  .grow-none { font-size: 14px; color: var(--gray); font-style: italic; background: white; border: 1px solid var(--gray-light); border-radius: 14px; padding: 16px; }
+  .gc { background: white; border: 1px solid var(--gray-light); border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; }
+  .gc-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .gc-name { font-weight: 700; color: var(--navy); font-size: 15px; }
+  .gc-fee { font-size: 13px; color: var(--gray); margin-left: auto; }
+  .gc-reason { font-size: 13px; color: var(--gray); margin: 8px 0 10px; line-height: 1.5; }
+  .gc-actions { display: flex; gap: 8px; }
+  .gc-script { margin-top: 10px; display: none; }
+  .gc-script.show { display: block; }
+  .gc-script textarea { width: 100%; min-height: 150px; resize: vertical; border: 1px solid var(--gray-light); border-radius: 10px; padding: 11px 13px; font-family: 'Inter'; font-size: 14px; line-height: 1.5; color: var(--ink); background: var(--cream); }
 </style>
 </head>
 <body>
@@ -975,6 +1002,7 @@
         <button onclick="showTab('rollout', this)"><span class="num">④</span> Rollout</button>
         <button onclick="showTab('tracker', this)"><span class="num">⑤</span> Tracker</button>
         <button onclick="showTab('fear', this)"><span class="num">⑥</span> Fear Killer</button>
+        <button onclick="showTab('grow', this)"><span class="num">↑</span> Grow</button>
         <button onclick="showTab('groom', this)"><span class="num">$</span> Groom for sale</button>
       </nav>
 
@@ -1268,7 +1296,43 @@
         </div>
       </div>
 
-      <!-- 7. GROOM FOR SALE -->
+      <!-- 7. GROW -->
+      <div class="panel" id="panel-grow">
+        <div class="section-header">
+          <div>
+            <span class="section-num">Grow</span>
+            <div class="section-title">Grow, do not just cut</div>
+          </div>
+          <p class="section-help">Who is ready for more, and how to price the next new client right.</p>
+        </div>
+        <div id="growEmpty" class="placeholder" style="display:none;">
+          <div class="icon">🌱</div>
+          <h3>Import your clients first</h3>
+          <p>Once your book is in, this surfaces the clients worth growing and helps you price new prospects to your target.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('import', document.querySelectorAll('.tabnav button')[1])">Go to import</button>
+        </div>
+        <div id="growMain" style="display:none;">
+          <div class="home-card">
+            <h4>Price a new prospect</h4>
+            <div class="np-help" id="npHelp">Enter the hours a new engagement will take and see the fee that hits your target rate.</div>
+            <div class="np-row">
+              <div class="np-field"><label>Estimated hours</label><input id="npHours" type="text" inputmode="numeric" placeholder="e.g. 12" /></div>
+              <div class="np-field"><label>Proposed fee <span class="lbl-hint">optional</span></label><input id="npFee" type="text" inputmode="numeric" placeholder="test a number" /></div>
+            </div>
+            <div class="np-out" id="npOut"></div>
+          </div>
+          <div class="grow-cands">
+            <div class="grow-head">
+              <h4>Advisory candidates</h4>
+              <span class="grow-sub" id="growCount"></span>
+            </div>
+            <div class="grow-none" id="growNone" style="display:none;">No clear candidates yet. Rate a few clients on risk and relationship (on the client card) and your best-fit ones will surface here.</div>
+            <div id="growList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. GROOM FOR SALE -->
       <div class="panel" id="panel-groom">
         <div class="section-header">
           <div>
@@ -1498,9 +1562,10 @@
     if (id === 'rollout' || id === 'tracker') loadRollout();
     if (id === 'fear') loadFear();
     if (id === 'home') loadOverview();
+    if (id === 'grow') loadGrow();
     if (id === 'groom') loadGroom();
   }
-  var TAB_INDEX = { home: 0, import: 1, decide: 2, words: 3, rollout: 4, tracker: 5, fear: 6, groom: 7 };
+  var TAB_INDEX = { home: 0, import: 1, decide: 2, words: 3, rollout: 4, tracker: 5, fear: 6, grow: 7, groom: 8 };
 
   // ---- auth flow ----
   var gate = document.getElementById('gate');
@@ -3092,6 +3157,94 @@
       }).join('');
     }
   }
+
+  // ---- grow (advisory candidates + new-prospect pricing) ----
+  var growState = { target: null, book: null, min: null, candidates: [] };
+  async function loadGrow() {
+    try {
+      var res = await fetch('/api/grow');
+      if (!res.ok) return;
+      var d = await res.json();
+      growState.target = d.target_rate; growState.book = d.book_rate; growState.min = d.min_fee || 0;
+      growState.candidates = d.candidates || [];
+      var empty = document.getElementById('growEmpty'), main = document.getElementById('growMain');
+      if (!d.clients) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+      empty.style.display = 'none'; main.style.display = 'block';
+      renderCandidates();
+      renderProspect();
+    } catch (e) { /* leave as-is */ }
+  }
+  function renderCandidates() {
+    var list = document.getElementById('growList');
+    var none = document.getElementById('growNone');
+    var count = document.getElementById('growCount');
+    var cs = growState.candidates;
+    count.textContent = cs.length ? cs.length + (cs.length === 1 ? ' client ready for more' : ' clients ready for more') : '';
+    if (!cs.length) { none.style.display = 'block'; list.innerHTML = ''; return; }
+    none.style.display = 'none';
+    list.innerHTML = cs.map(function (c, i) {
+      return '<div class="gc">' +
+        '<div class="gc-top">' + tierBadge(c.tier) + '<span class="gc-name">' + esc(c.name) + '</span>' +
+        '<span class="gc-fee">' + (c.annual_fee != null ? money(c.annual_fee) + ' now' : '') + '</span></div>' +
+        '<div class="gc-reason">' + esc(c.reason) + '</div>' +
+        '<div class="gc-actions"><button class="btn btn-secondary btn-sm gc-toggle" data-i="' + i + '">Show outreach</button>' +
+        '<button class="btn btn-secondary btn-sm gc-copy" data-i="' + i + '">Copy</button></div>' +
+        '<div class="gc-script" data-i="' + i + '"><textarea>' + esc(c.script) + '</textarea></div>' +
+        '</div>';
+    }).join('');
+    list.querySelectorAll('.gc-toggle').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var s = list.querySelector('.gc-script[data-i="' + b.getAttribute('data-i') + '"]');
+        var open = s.classList.toggle('show');
+        b.textContent = open ? 'Hide outreach' : 'Show outreach';
+      });
+    });
+    list.querySelectorAll('.gc-copy').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var i = +b.getAttribute('data-i');
+        var s = list.querySelector('.gc-script[data-i="' + i + '"] textarea');
+        var text = s ? s.value : growState.candidates[i].script;
+        if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { flashOk('Copied outreach for ' + growState.candidates[i].name + '.'); }, function () {});
+      });
+    });
+  }
+  function prospectTier(rate, target) {
+    if (rate >= target * 1.25) return 'A';
+    if (rate >= target) return 'B';
+    if (rate >= target * 0.6) return 'C';
+    return 'D';
+  }
+  function renderProspect() {
+    var out = document.getElementById('npOut');
+    var help = document.getElementById('npHelp');
+    var bench = growState.target || growState.book || 0;
+    help.textContent = growState.target
+      ? 'Priced to your $' + Math.round(growState.target) + '/hr target' + (growState.min ? ', floored at your ' + money(growState.min) + ' minimum.' : '.')
+      : (growState.book ? 'No target set, so priced to your book average of $' + Math.round(growState.book) + '/hr. Set a target in Settings.' : 'Set a target realized rate in Settings to price prospects.');
+    var hours = parseNum(document.getElementById('npHours').value);
+    var fee = parseNum(document.getElementById('npFee').value);
+    if (!hours || hours <= 0) { out.innerHTML = ''; return; }
+    if (fee && fee > 0) {
+      var rate = fee / hours;
+      var msg = '<span class="big">$' + Math.round(rate) + '/hr</span> at ' + money(fee) + ' for ' + hours + ' hours.';
+      if (growState.target) {
+        var t = prospectTier(rate, growState.target);
+        var good = rate >= growState.target;
+        msg += ' <span class="verdict ' + (good ? 'good' : 'warn') + '">' + (good ? 'lands in ' + t : 'below target · ' + t) + '</span>';
+      } else if (growState.book) {
+        var good2 = rate >= growState.book;
+        msg += ' <span class="verdict ' + (good2 ? 'good' : 'warn') + '">' + (good2 ? 'above book' : 'below book') + '</span>';
+      }
+      out.innerHTML = msg;
+    } else if (bench > 0) {
+      var suggested = Math.max(Math.ceil(bench * hours / 50) * 50, growState.min || 0);
+      out.innerHTML = 'Quote <span class="big">' + money(suggested) + '</span> for ' + hours + ' hours to hit $' + Math.round(bench) + '/hr.';
+    } else {
+      out.innerHTML = '';
+    }
+  }
+  document.getElementById('npHours').addEventListener('input', renderProspect);
+  document.getElementById('npFee').addEventListener('input', renderProspect);
 
   document.getElementById('reportBtn').addEventListener('click', printReport);
   document.getElementById('exportBtn').addEventListener('click', exportCsv);

@@ -45,6 +45,7 @@ import type { Action, WaveType, WaveStatus, CommitmentState } from "./types";
 import { generateWords } from "./words";
 import { buildHandoffPacket } from "./handoff";
 import { computeValuation } from "./valuation";
+import { adviseGrow } from "./grow";
 import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
@@ -167,6 +168,9 @@ export default {
       }
       if (pathname === "/api/valuation" && request.method === "GET") {
         return await handleValuation(request, env);
+      }
+      if (pathname === "/api/grow" && request.method === "GET") {
+        return await handleGrow(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -646,6 +650,28 @@ async function handleValuation(request: Request, env: Env): Promise<Response> {
   if (!firm) return json({ error: "unauthorized" }, 401);
   const clients = await listClients(env, firm.id);
   return json(computeValuation(clients, firm.target_rate));
+}
+
+/** GET /api/grow — advisory-upsell candidates + the inputs to price a new prospect. */
+async function handleGrow(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const [clients, decisions] = await Promise.all([listClients(env, firm.id), getDecisions(env, firm.id)]);
+  const candidates = adviseGrow(clients, decisions);
+  // Book realized rate (weighted) as a pricing benchmark when no target is set.
+  let feeSum = 0, hourSum = 0;
+  for (const c of clients) {
+    if (c.annual_fee != null && c.est_hours && c.est_hours > 0) { feeSum += c.annual_fee; hourSum += c.est_hours; }
+  }
+  const bookRate = hourSum > 0 ? feeSum / hourSum : null;
+  return json({
+    candidates,
+    count: candidates.length,
+    clients: clients.length,
+    target_rate: firm.target_rate,
+    book_rate: bookRate,
+    min_fee: firm.min_fee,
+  });
 }
 
 const ACTIONS: Action[] = ["keep", "raise", "fire", "nudge"];
