@@ -1444,7 +1444,11 @@
             <h4>What lifts the price</h4>
             <div id="valLevers"></div>
           </div>
-          <p class="val-note">A rough estimate from your own book, not a formal appraisal. Small firms often trade near 0.6x to 1.3x annual recurring revenue; the multiple moves with realization, client mix, and how concentrated your revenue is.</p>
+          <div class="home-actions">
+            <button class="btn btn-secondary" id="dataRoomBtn">Print buyer package</button>
+            <button class="btn btn-secondary" id="dataRoomCsvBtn">Export metrics (CSV)</button>
+          </div>
+          <p class="val-note">A rough estimate from your own book, not a formal appraisal. Small firms often trade near 0.6x to 1.3x annual recurring revenue; the multiple moves with realization, client mix, and how concentrated your revenue is. The buyer package is the diligence view an acquirer would ask for.</p>
         </div>
       </div>
 
@@ -3344,6 +3348,80 @@
       renderGroom(await res.json());
     } catch (e) { /* leave as-is */ }
   }
+
+  // ---- sell-side data room (buyer package) ----
+  async function fetchDataRoom() {
+    var res = await fetch('/api/dataroom');
+    if (!res.ok) throw new Error('dataroom');
+    return res.json();
+  }
+  function pctStr(x) { return Math.round((x || 0) * 100) + '%'; }
+  async function printBuyerPackage() {
+    try {
+      var d = await fetchDataRoom();
+      var w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write(buildDataRoomHtml(d));
+      w.document.close(); w.focus();
+      setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
+    } catch (e) { flash('Could not build the buyer package. Please try again.'); }
+  }
+  function buildDataRoomHtml(d) {
+    var name = (d.firm_name || firmSettings.name || 'Your firm');
+    var date = new Date().toLocaleDateString();
+    var rate = d.book_rate != null ? '$' + Math.round(d.book_rate) + '/hr' : '—';
+    var concRows = (d.concentration.top_clients || []).map(function (c) {
+      return '<tr><td>' + esc(c.name) + '</td><td class="r">' + money(c.fee) + '</td><td class="r">' + pctStr(c.pct) + '</td></tr>';
+    }).join('');
+    var svcRows = (d.by_service || []).map(function (s) {
+      return '<tr><td>' + esc(s.service) + '</td><td class="r">' + s.count + '</td><td class="r">' + money(s.revenue) + '</td><td class="r">' + pctStr(s.pct) + '</td></tr>';
+    }).join('');
+    var A = d.tiers || {};
+    return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(name) + ' — buyer package</title>' +
+      '<style>body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1F3A3D;max-width:780px;margin:32px auto;padding:0 22px;}' +
+      'h1{font-size:22px;margin:0 0 2px;}h2{font-size:15px;margin:26px 0 8px;border-bottom:2px solid #1F3A3D;padding-bottom:4px;}' +
+      '.muted{color:#6B6B6B;font-size:13px;}.hero{background:#1F3A3D;color:#fff;border-radius:12px;padding:18px 20px;margin:16px 0;}' +
+      '.hero .v{font-size:26px;font-weight:700;}.hero .s{opacity:.8;font-size:13px;margin-top:4px;}' +
+      '.grid{display:flex;flex-wrap:wrap;gap:22px;margin:10px 0;}.grid .m b{display:block;font-size:19px;}.grid .m span{font-size:12px;color:#6B6B6B;}' +
+      'table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eee;}td.r,th.r{text-align:right;}' +
+      'th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6B6B6B;}@media print{body{margin:0;}}</style></head><body>' +
+      '<h1>' + esc(name) + '</h1><div class="muted">Practice overview for diligence · ' + date + '</div>' +
+      '<div class="hero"><div class="v">' + money(d.value.low) + ' – ' + money(d.value.high) + '</div><div class="s">Estimated practice value · ' + d.value.multiple.toFixed(2) + 'x recurring revenue. Estimate, not a formal appraisal.</div></div>' +
+      '<h2>Revenue and clients</h2><div class="grid">' +
+      '<div class="m"><b>' + money(d.gross_revenue) + '</b><span>recurring revenue</span></div>' +
+      '<div class="m"><b>' + d.clients + '</b><span>clients</span></div>' +
+      '<div class="m"><b>' + money(d.avg_fee) + '</b><span>average fee</span></div>' +
+      '<div class="m"><b>' + money(d.median_fee) + '</b><span>median fee</span></div>' +
+      '<div class="m"><b>' + rate + '</b><span>realized rate</span></div></div>' +
+      '<h2>Client concentration</h2><div class="muted">Top client ' + pctStr(d.concentration.top1_pct) + ' · top 5 ' + pctStr(d.concentration.top5_pct) + ' · top 10 ' + pctStr(d.concentration.top10_pct) + ' of revenue.</div>' +
+      '<table><thead><tr><th>Largest clients</th><th class="r">Fee</th><th class="r">% of revenue</th></tr></thead><tbody>' + concRows + '</tbody></table>' +
+      '<h2>Revenue by service</h2><table><thead><tr><th>Service</th><th class="r">Clients</th><th class="r">Revenue</th><th class="r">% of revenue</th></tr></thead><tbody>' + svcRows + '</tbody></table>' +
+      '<h2>Tier mix</h2><div class="muted">A ' + (A.A || 0) + ' · B ' + (A.B || 0) + ' · C ' + (A.C || 0) + ' · D ' + (A.D || 0) + (A.unranked ? ' · unranked ' + A.unranked : '') + ' (by realized rate' + (firmSettings.target_rate ? ' vs your $' + Math.round(firmSettings.target_rate) + '/hr target' : '') + ').</div>' +
+      '</body></html>';
+  }
+  async function exportDataRoomCsv() {
+    try {
+      var d = await fetchDataRoom();
+      var rows = [['Metric', 'Value']];
+      rows.push(['Recurring revenue', d.gross_revenue]);
+      rows.push(['Clients', d.clients]);
+      rows.push(['Average fee', d.avg_fee]);
+      rows.push(['Median fee', d.median_fee]);
+      rows.push(['Realized rate ($/hr)', d.book_rate != null ? Math.round(d.book_rate) : '']);
+      rows.push(['Estimated value low', d.value.low]);
+      rows.push(['Estimated value high', d.value.high]);
+      rows.push(['Value multiple', d.value.multiple.toFixed(2)]);
+      rows.push(['Top client % of revenue', Math.round(d.concentration.top1_pct * 100)]);
+      rows.push(['Top 5 % of revenue', Math.round(d.concentration.top5_pct * 100)]);
+      rows.push(['Top 10 % of revenue', Math.round(d.concentration.top10_pct * 100)]);
+      rows.push(['', '']);
+      rows.push(['Service', 'Clients', 'Revenue', '% of revenue']);
+      (d.by_service || []).forEach(function (s) { rows.push([s.service, s.count, s.revenue, Math.round(s.pct * 100)]); });
+      downloadFile('boundary-crm-buyer-metrics.csv', 'text/csv', rows.map(function (r) { return r.map(csvCell).join(','); }).join('\n'));
+    } catch (e) { flash('Could not export the metrics. Please try again.'); }
+  }
+  document.getElementById('dataRoomBtn').addEventListener('click', printBuyerPackage);
+  document.getElementById('dataRoomCsvBtn').addEventListener('click', exportDataRoomCsv);
   function renderGroom(v) {
     var empty = document.getElementById('groomEmpty'), main = document.getElementById('groomMain');
     if (!v.clients) { empty.style.display = 'block'; main.style.display = 'none'; return; }

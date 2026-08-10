@@ -289,6 +289,16 @@ It is a defensible estimate for grooming decisions, clearly labeled as not a for
 appraisal. This is the single-firm seed of a succession story; a buyer-matching network is
 a possible later step.
 
+### Buyer package (sell-side data room)
+
+When an owner is heading toward a sale, **Print buyer package** and **Export metrics (CSV)**
+produce the diligence view an acquirer asks for. `GET /api/dataroom` (`src/dataroom.ts`)
+assembles it: recurring revenue, average and median fee, realized rate, client
+concentration (top 1 / 5 / 10 percent, with the largest clients named), revenue by service
+line, tier mix, and the value estimate. The package prints as a clean one-pager under the
+firm's name; the CSV is the same numbers for a spreadsheet. Read-only, built from the same
+data the rest of the app uses.
+
 ## Decision factors and capacity
 
 Realized rate is not the whole story, so a client also carries two optional 1 (low) to 3
@@ -355,6 +365,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/sample/clear` | POST | Remove just the demo clients |
 | `/api/handoffs` | GET | Transition packets for every client being let go |
 | `/api/valuation` | GET | Practice-value estimate + grooming levers |
+| `/api/dataroom` | GET | Buyer-ready diligence metrics for the whole book |
 | `/api/grow` | GET | Advisory-upsell candidates + new-prospect pricing inputs |
 | `/api/attention` | GET | The always-on worklist (below target/market, missing, silent) |
 | `/api/scenario` | POST | Model tier-wide pricing moves; before/after impact |
@@ -447,6 +458,7 @@ boundary-crm/
     assistant.ts        in-app Claude assistant: firm-scoped tool-use loop
     handoff.ts          transition-packet builder for goodbyes
     valuation.ts        practice-value estimate + grooming levers
+    dataroom.ts         buyer-ready diligence metrics (sell-side data room)
     scenario.ts         what-if modeling of tier-wide pricing moves
     grow.ts             advisory-upsell candidates + outreach scripts
     benchmarks.ts       fee-vs-market service bands + comparison

@@ -53,6 +53,7 @@ import { computeValuation } from "./valuation";
 import { adviseGrow } from "./grow";
 import { computeBenchmarks } from "./benchmarks";
 import { runScenario, type ScenarioLevers } from "./scenario";
+import { computeDataRoom } from "./dataroom";
 import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
@@ -187,6 +188,9 @@ export default {
       }
       if (pathname === "/api/valuation" && request.method === "GET") {
         return await handleValuation(request, env);
+      }
+      if (pathname === "/api/dataroom" && request.method === "GET") {
+        return await handleDataRoom(request, env);
       }
       if (pathname === "/api/grow" && request.method === "GET") {
         return await handleGrow(request, env);
@@ -800,6 +804,14 @@ async function handleAttention(request: Request, env: Env): Promise<Response> {
   ].filter((i) => i.count > 0);
 
   return json({ items, total: items.reduce((s, i) => s + i.count, 0) });
+}
+
+/** GET /api/dataroom — buyer-ready diligence metrics for the whole book. */
+async function handleDataRoom(request: Request, env: Env): Promise<Response> {
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ error: "unauthorized" }, 401);
+  const clients = await listClients(env, ctx.firm.id);
+  return json({ ...computeDataRoom(clients, ctx.firm.target_rate), firm_name: ctx.firm.name });
 }
 
 /** GET /api/grow — advisory-upsell candidates + the inputs to price a new prospect. */
