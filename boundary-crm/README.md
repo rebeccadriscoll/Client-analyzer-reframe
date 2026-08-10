@@ -196,6 +196,24 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
   D bottom 20%). Rows with no name are skipped; rows with no fee/hours import but stay
   unranked. Setting or changing the target re-tiers the whole book.
 
+## Grow, not just cut
+
+The profession's whole strategic push is up-market, from commodity compliance to advisory,
+so the **Grow** module looks up as well as down. `GET /api/grow` (`src/grow.ts`) does two
+things:
+
+- **Advisory candidates** — the clients worth *growing*, not cutting: a good tier, low
+  risk, a real relationship, and ideally a business that needs more than a return. Each
+  comes with the reason and a ready, voice-compliant outreach script to offer a paid
+  advisory touchpoint.
+- **Price a new prospect** — enter the hours a new engagement will take and get the fee
+  that hits your target rate (floored at your minimum), or test a fee and see the realized
+  rate and which tier it would land in. Falls back to your book's realized rate when no
+  target is set.
+
+Together with the raise/keep/nudge/fire calls, this closes the loop: the tool now helps
+price and grow the book, not only trim it.
+
 ## Groom for sale (the book as an asset)
 
 For the wave of owners nearing retirement, the book is the retirement asset, and a clean,
@@ -277,6 +295,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/sample/clear` | POST | Remove just the demo clients |
 | `/api/handoffs` | GET | Transition packets for every client being let go |
 | `/api/valuation` | GET | Practice-value estimate + grooming levers |
+| `/api/grow` | GET | Advisory-upsell candidates + new-prospect pricing inputs |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
@@ -365,6 +384,7 @@ boundary-crm/
     assistant.ts        in-app Claude assistant: firm-scoped tool-use loop
     handoff.ts          transition-packet builder for goodbyes
     valuation.ts        practice-value estimate + grooming levers
+    grow.ts             advisory-upsell candidates + outreach scripts
     rollout.ts          wave order/labels + proposed-fee logic
     commit_page.ts      public commitment confirm page (HTML)
     import/
