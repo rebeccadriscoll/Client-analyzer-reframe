@@ -40,6 +40,17 @@ It shows revenue let go, revenue from raises, net change, and hours back, with a
 plain-language verdict and the names of who would be let go. Runs entirely client-side
 from `GET /api/clients`.
 
+### Scenario planner
+
+Below the sliders, **Model a scenario** projects tier-wide pricing moves across the whole
+book, no writes. Choose what to do with C-tier (keep / raise to target) and D-tier (keep /
+raise / let go), optionally lift below-market clients to their range low, and see the
+before/after impact: revenue change, **hours freed**, realized rate, and the **practice
+value** delta. `POST /api/scenario` (`src/scenario.ts`) builds the modeled book, re-tiers
+it, and runs the valuation on both. It surfaces the real trade-off: letting go of the
+bottom tier can dip revenue while lifting realized rate, freeing capacity, *and* raising
+sale value, because buyers pay a higher multiple for a cleaner, higher-realization book.
+
 ## Rollout and tracker (Step 5)
 
 **Rollout** groups decisions into four waves in send order that keeps revenue steady:
@@ -346,6 +357,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/valuation` | GET | Practice-value estimate + grooming levers |
 | `/api/grow` | GET | Advisory-upsell candidates + new-prospect pricing inputs |
 | `/api/attention` | GET | The always-on worklist (below target/market, missing, silent) |
+| `/api/scenario` | POST | Model tier-wide pricing moves; before/after impact |
 | `/api/benchmarks` | GET | Each client's fee vs a market range for its service |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
@@ -435,6 +447,7 @@ boundary-crm/
     assistant.ts        in-app Claude assistant: firm-scoped tool-use loop
     handoff.ts          transition-packet builder for goodbyes
     valuation.ts        practice-value estimate + grooming levers
+    scenario.ts         what-if modeling of tier-wide pricing moves
     grow.ts             advisory-upsell candidates + outreach scripts
     benchmarks.ts       fee-vs-market service bands + comparison
     rollout.ts          wave order/labels + proposed-fee logic
