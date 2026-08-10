@@ -245,10 +245,19 @@ things:
 - **Price a new prospect** — enter the hours a new engagement will take and get the fee
   that hits your target rate (floored at your minimum), or test a fee and see the realized
   rate and which tier it would land in. Falls back to your book's realized rate when no
-  target is set.
+  target is set. **Add to book** then creates the client at that fee, so every new client
+  is priced through the tool and the book stays current.
 
 Together with the raise/keep/nudge/fire calls, this closes the loop: the tool now helps
 price and grow the book, not only trim it.
+
+## Needs attention (always-on)
+
+The Home dashboard surfaces a **Needs attention** hub so the tool is useful year-round, not
+only at the annual cleanup. `GET /api/attention` returns the live worklist: clients priced
+below your target that are still undecided, clients priced below the market range, clients
+missing a fee or hours, and clients gone silent 7+ days after being told. Each row jumps
+straight to the tab that resolves it. It hides itself when there is nothing to do.
 
 ## Groom for sale (the book as an asset)
 
@@ -336,6 +345,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/handoffs` | GET | Transition packets for every client being let go |
 | `/api/valuation` | GET | Practice-value estimate + grooming levers |
 | `/api/grow` | GET | Advisory-upsell candidates + new-prospect pricing inputs |
+| `/api/attention` | GET | The always-on worklist (below target/market, missing, silent) |
 | `/api/benchmarks` | GET | Each client's fee vs a market range for its service |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |

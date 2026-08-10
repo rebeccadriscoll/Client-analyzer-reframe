@@ -190,6 +190,9 @@ export default {
       if (pathname === "/api/grow" && request.method === "GET") {
         return await handleGrow(request, env);
       }
+      if (pathname === "/api/attention" && request.method === "GET") {
+        return await handleAttention(request, env);
+      }
       if (pathname === "/api/benchmarks" && request.method === "GET") {
         return await handleBenchmarks(request, env);
       }
@@ -750,6 +753,36 @@ async function handleBenchmarks(request: Request, env: Env): Promise<Response> {
   if (!firm) return json({ error: "unauthorized" }, 401);
   const clients = await listClients(env, firm.id);
   return json({ ...computeBenchmarks(clients), clients: clients.length });
+}
+
+/** GET /api/attention — the always-on hub: what needs looking at right now. */
+async function handleAttention(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const [clients, decisions, commitments] = await Promise.all([
+    listClients(env, firm.id),
+    getDecisions(env, firm.id),
+    getCommitments(env, firm.id),
+  ]);
+  const decided = new Set(decisions.map((d) => d.client_id));
+  const target = firm.target_rate;
+
+  const belowTarget = target
+    ? clients.filter((c) => c.realized_rate != null && c.realized_rate < target && !decided.has(c.id)).length
+    : 0;
+  const belowMarket = computeBenchmarks(clients).summary.below;
+  const missing = clients.filter((c) => c.annual_fee == null || !c.est_hours).length;
+  const now = Date.now();
+  const silent = commitments.filter((c) => c.state === "told" && now - c.updated_at > 7 * 86400000).length;
+
+  const items = [
+    { key: "below_target", count: belowTarget, tab: "decide", label: "priced below your target, still undecided" },
+    { key: "below_market", count: belowMarket, tab: "bench", label: "priced below the market range" },
+    { key: "missing", count: missing, tab: "import", label: "missing a fee or hours" },
+    { key: "silent", count: silent, tab: "tracker", label: "gone silent 7+ days after being told" },
+  ].filter((i) => i.count > 0);
+
+  return json({ items, total: items.reduce((s, i) => s + i.count, 0) });
 }
 
 /** GET /api/grow — advisory-upsell candidates + the inputs to price a new prospect. */
