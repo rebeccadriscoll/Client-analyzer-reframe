@@ -28,6 +28,24 @@ export interface Env {
   APP_URL?: string;
 }
 
+export type MemberRole = "owner" | "member";
+
+export interface Member {
+  id: string;
+  firm_id: string;
+  email: string;
+  role: MemberRole;
+  created_at: number;
+}
+
+export interface FirmInvite {
+  id: string;
+  firm_id: string;
+  email: string;
+  role: MemberRole;
+  created_at: number;
+}
+
 export type Tier = "A" | "B" | "C" | "D";
 
 export type Action = "keep" | "raise" | "fire" | "nudge";
@@ -97,6 +115,8 @@ export interface Client {
   risk_level: number | null;
   /** 1 (low) .. 3 (high): value beyond the fee (referrals, tenure, growth). */
   relationship_level: number | null;
+  /** Which member manages this client (shared book stays visible to all). */
+  owner_member_id: string | null;
   created_at: number;
 }
 

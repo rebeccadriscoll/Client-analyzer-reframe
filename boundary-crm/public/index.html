@@ -932,6 +932,17 @@
   .bstatus.within { background: rgba(45,106,107,0.12); color: var(--teal); }
   .bstatus.above { background: var(--cream-deep); color: var(--gray); }
   #benchTable td.gap { color: var(--coral-deep); font-weight: 600; }
+
+  /* ===== TEAM ===== */
+  .team-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(31,58,61,0.08); }
+  .team-row:last-child { border-bottom: none; }
+  .team-email { font-size: 14px; color: var(--navy); font-weight: 500; }
+  .team-role { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 100px; margin-left: 6px; }
+  .team-role.owner { background: rgba(45,106,107,0.12); color: var(--teal); }
+  .team-role.member { background: var(--cream-deep); color: var(--gray); }
+  .team-role.invited { background: #FFF6DC; color: #9A7B12; }
+  .team-err { font-size: 13px; color: #B4362B; margin: 4px 0; min-height: 0; }
+  .team-err:empty { display: none; }
 </style>
 </head>
 <body>
@@ -1542,6 +1553,17 @@
       </div>
 
       <div class="notes-wrap">
+        <h5>Team</h5>
+        <p class="season-help">Everyone you add shares this firm's whole book. Only the owner can invite or remove people.</p>
+        <div class="note-add" id="teamInviteRow" style="display:none;">
+          <input id="teamEmail" class="season-label" type="email" inputmode="email" placeholder="colleague@yourfirm.com" />
+          <button class="btn btn-primary" id="teamInviteBtn">Invite</button>
+        </div>
+        <div class="team-err" id="teamErr"></div>
+        <div id="teamList"></div>
+      </div>
+
+      <div class="notes-wrap">
         <h5>Season</h5>
         <p class="season-help">Closing a season snapshots this cycle (decisions and committed revenue) and clears it so you can start fresh next time. Your clients and notes stay.</p>
         <div class="note-add">
@@ -1660,7 +1682,7 @@
     });
   };
 
-  var firmSettings = { name: null, min_fee: null, batch_size: null, target_rate: null };
+  var firmSettings = { name: null, min_fee: null, batch_size: null, target_rate: null, role: null };
 
   function applySettings(firm) {
     if (!firm) return;
@@ -1668,6 +1690,7 @@
     firmSettings.min_fee = firm.min_fee;
     firmSettings.batch_size = firm.batch_size;
     firmSettings.target_rate = firm.target_rate;
+    firmSettings.role = firm.role;
     document.getElementById('brandTag').textContent = firm.name || 'Your firm';
     if (firm.batch_size) {
       var sel = document.getElementById('batchSize');
@@ -3463,7 +3486,10 @@
     document.getElementById('setMinFee').value = firmSettings.min_fee != null ? firmSettings.min_fee : '';
     document.getElementById('setBatch').value = firmSettings.batch_size != null ? firmSettings.batch_size : '';
     document.getElementById('seasonLabel').value = '';
+    document.getElementById('teamErr').textContent = '';
+    document.getElementById('teamEmail').value = '';
     loadSeasons();
+    loadTeam();
     var ov = document.getElementById('settingsModal');
     ov.classList.add('show'); document.body.style.overflow = 'hidden';
   }
@@ -3488,6 +3514,68 @@
     } catch (e) { /* ignore */ }
     btn.disabled = false; btn.textContent = 'Save';
   }
+
+  // ---- team ----
+  async function loadTeam() {
+    try {
+      var res = await fetch('/api/team');
+      if (!res.ok) return;
+      renderTeam(await res.json());
+    } catch (e) { /* ignore */ }
+  }
+  function teamErrMsg(code) {
+    return {
+      already_member: 'They are already on your team.',
+      already_invited: 'They have already been invited.',
+      in_other_firm: 'That email already belongs to another firm.',
+      invited_elsewhere: 'That email is already invited to another firm.',
+      invalid_email: 'Enter a valid email address.'
+    }[code] || 'Could not send that invite.';
+  }
+  function renderTeam(d) {
+    var isOwner = d.me.role === 'owner';
+    document.getElementById('teamInviteRow').style.display = isOwner ? 'flex' : 'none';
+    var html = d.members.map(function (m) {
+      var you = m.id === d.me.id;
+      var right = (isOwner && m.role !== 'owner' && !you) ? '<button class="link-btn team-remove" data-id="' + m.id + '">Remove</button>' : '';
+      return '<div class="team-row"><div><span class="team-email">' + esc(m.email) + (you ? ' (you)' : '') + '</span><span class="team-role ' + m.role + '">' + m.role + '</span></div>' + right + '</div>';
+    }).join('');
+    html += d.invites.map(function (i) {
+      var right = isOwner ? '<button class="link-btn team-cancel" data-email="' + esc(i.email) + '">Cancel</button>' : '';
+      return '<div class="team-row"><div><span class="team-email">' + esc(i.email) + '</span><span class="team-role invited">invited</span></div>' + right + '</div>';
+    }).join('');
+    var el = document.getElementById('teamList');
+    el.innerHTML = html;
+    el.querySelectorAll('.team-remove').forEach(function (b) {
+      b.addEventListener('click', function () { teamAction('/api/team/remove', { member_id: b.getAttribute('data-id') }); });
+    });
+    el.querySelectorAll('.team-cancel').forEach(function (b) {
+      b.addEventListener('click', function () { teamAction('/api/team/uninvite', { email: b.getAttribute('data-email') }); });
+    });
+  }
+  async function teamAction(url, payload) {
+    try {
+      var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      var d = await res.json();
+      if (!res.ok) { document.getElementById('teamErr').textContent = teamErrMsg(d.error); return; }
+      document.getElementById('teamErr').textContent = '';
+      renderTeam(d);
+    } catch (e) { document.getElementById('teamErr').textContent = 'Something went wrong. Try again.'; }
+  }
+  async function inviteTeam() {
+    var email = document.getElementById('teamEmail').value.trim();
+    if (!email) return;
+    var btn = document.getElementById('teamInviteBtn'); btn.disabled = true;
+    try {
+      var res = await fetch('/api/team/invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) });
+      var d = await res.json();
+      if (!res.ok) { document.getElementById('teamErr').textContent = teamErrMsg(d.error); }
+      else { document.getElementById('teamErr').textContent = ''; document.getElementById('teamEmail').value = ''; renderTeam(d); flashOk('Invited ' + email + '. They join when they sign in.'); }
+    } catch (e) { document.getElementById('teamErr').textContent = 'Something went wrong. Try again.'; }
+    btn.disabled = false;
+  }
+  document.getElementById('teamInviteBtn').addEventListener('click', inviteTeam);
+  document.getElementById('teamEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inviteTeam(); } });
 
   async function loadSeasons() {
     try {

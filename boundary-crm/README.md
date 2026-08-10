@@ -196,6 +196,24 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
   D bottom 20%). Rows with no name are skipped; rows with no fee/hours import but stay
   unranked. Setting or changing the target re-tiers the whole book.
 
+## Team (multi-user)
+
+A firm is a shared workspace; a **member** is a person (by email). The founding user is the
+**owner** (can invite and remove); invited users are **members**. Everyone in a firm shares
+the whole book, which is the right model for firm-wide capacity and pricing calls.
+
+- **Invites**: the owner adds an email in Settings → Team. That email joins the firm the
+  next time it signs in (a pending `firm_invite` becomes a `member`), rather than starting
+  its own firm. Sign-in stays magic-link only; there is no separate accept step.
+- **Roles**: only the owner can invite or remove. Members can do everything else.
+- **Auth model**: sign-in resolves an email to its member (existing, invited, or brand-new
+  owner of a new firm). Sessions carry the acting member; legacy sessions fall back to the
+  firm owner, so nothing breaks across the upgrade. `GET /api/team`, `POST
+  /api/team/invite|uninvite|remove`.
+
+A per-client "managed by" tag ships in the schema (`client.owner_member_id`) for a
+follow-up that lets partners filter the shared book to their own clients.
+
 ## Benchmarks (fees vs the market)
 
 Realized rate tells you if a client is profitable *for the hours*; benchmarks tell you if
@@ -297,6 +315,10 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/words/handoff` | POST | Mint the confirm link + mark told, for the owner to send (`{ client_id }`) |
 | `/api/overview` | GET | Dashboard aggregates + suggested next step |
 | `/api/settings` | GET/POST | Firm name, target rate, minimum fee, default batch size |
+| `/api/team` | GET | Firm members + pending invites + who you are |
+| `/api/team/invite` | POST | Owner invites an email (`{ email }`) |
+| `/api/team/uninvite` | POST | Owner cancels a pending invite (`{ email }`) |
+| `/api/team/remove` | POST | Owner removes a member (`{ member_id }`) |
 | `/api/seasons` | GET | Past closed seasons |
 | `/api/seasons/close` | POST | Snapshot the cycle + clear it (`{ label }`) |
 | `/api/clients/create` | POST | Add a client by hand (re-tiers the book) |
@@ -390,7 +412,7 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth … 0008 settings + season; 0009 target rate + risk/relationship)
+  migrations/           D1 schema (0001 auth … 0009 target rate + risk/relationship; 0010 members + invites)
   src/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)
