@@ -52,6 +52,7 @@ import { buildHandoffPacket } from "./handoff";
 import { computeValuation } from "./valuation";
 import { adviseGrow } from "./grow";
 import { computeBenchmarks } from "./benchmarks";
+import { runScenario, type ScenarioLevers } from "./scenario";
 import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
@@ -192,6 +193,9 @@ export default {
       }
       if (pathname === "/api/attention" && request.method === "GET") {
         return await handleAttention(request, env);
+      }
+      if (pathname === "/api/scenario" && request.method === "POST") {
+        return await handleScenario(request, env);
       }
       if (pathname === "/api/benchmarks" && request.method === "GET") {
         return await handleBenchmarks(request, env);
@@ -753,6 +757,19 @@ async function handleBenchmarks(request: Request, env: Env): Promise<Response> {
   if (!firm) return json({ error: "unauthorized" }, 401);
   const clients = await listClients(env, firm.id);
   return json({ ...computeBenchmarks(clients), clients: clients.length });
+}
+
+/** POST /api/scenario { c, d, belowMarket } — model pricing moves, no writes. */
+async function handleScenario(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const body = await readJson(request);
+  const c = body && body.c === "raise" ? "raise" : "keep";
+  const d = body && (body.d === "raise" || body.d === "drop") ? body.d : "keep";
+  const belowMarket = !!(body && body.belowMarket);
+  const levers: ScenarioLevers = { c, d: d as ScenarioLevers["d"], belowMarket };
+  const clients = await listClients(env, firm.id);
+  return json(runScenario(clients, firm.target_rate, firm.min_fee, levers));
 }
 
 /** GET /api/attention — the always-on hub: what needs looking at right now. */

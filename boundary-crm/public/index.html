@@ -647,6 +647,22 @@
   }
   .fear-verdict.ok { border-left-color: var(--tier-a); }
   .fear-verdict.warn { border-left-color: var(--coral-deep); background: rgba(196,69,54,0.05); }
+  .scenario-card { background: white; border-radius: 16px; padding: 22px 24px; box-shadow: var(--shadow-sm); border: 1px solid rgba(31,58,61,0.08); margin-top: 18px; }
+  .scenario-card h4 { font-family: 'Fraunces', serif; font-size: 19px; color: var(--navy); margin-bottom: 4px; }
+  .sc-help { font-size: 13px; color: var(--gray); margin-bottom: 16px; }
+  .sc-levers { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 18px; }
+  .sc-lever { display: flex; flex-direction: column; gap: 5px; }
+  .sc-lever label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray); }
+  .sc-lever select { padding: 9px 12px; font-size: 14px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; cursor: pointer; }
+  .sc-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--navy); cursor: pointer; align-self: flex-end; }
+  .sc-out { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 720px) { .sc-out { grid-template-columns: repeat(2, 1fr); } }
+  .sc-tile { background: var(--cream); border-radius: 12px; padding: 14px 16px; }
+  .sc-tile .sc-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray); margin-bottom: 6px; }
+  .sc-tile .sc-val { font-family: 'Fraunces', serif; font-size: 21px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+  .sc-tile .sc-sub { font-size: 12px; color: var(--gray); margin-top: 3px; }
+  .sc-tile .sc-val.pos { color: var(--teal); }
+  .sc-tile .sc-val.neg { color: var(--coral-deep); }
   .fear-verdict b { font-weight: 700; }
   .fear-verdict .cut-names { font-size: 13px; color: var(--gray); margin-top: 8px; }
 
@@ -1337,6 +1353,19 @@
             <div class="fstat"><div class="fstat-label">Hours back</div><div class="fstat-value" id="fHours">0</div><div class="fstat-sub">freed for better work</div></div>
           </div>
           <div class="fear-verdict" id="fearVerdict"></div>
+
+          <div class="scenario-card">
+            <h4>Model a scenario</h4>
+            <div class="sc-help">Try pricing moves across your whole book and see the impact on revenue, capacity, and sale value. Nothing is saved.</div>
+            <div class="sc-levers">
+              <div class="sc-lever"><label>C-tier clients</label>
+                <select id="scC"><option value="keep">Keep as-is</option><option value="raise">Raise to target</option></select></div>
+              <div class="sc-lever"><label>D-tier clients</label>
+                <select id="scD"><option value="keep">Keep as-is</option><option value="raise">Raise to target</option><option value="drop">Let go</option></select></div>
+              <label class="sc-check"><input type="checkbox" id="scBelow" /> Raise below-market clients to the market low</label>
+            </div>
+            <div class="sc-out" id="scOut"></div>
+          </div>
         </div>
       </div>
 
@@ -2905,7 +2934,42 @@
       fear.clients = (await res.json()).clients || [];
     } catch (e) { return; }
     renderFear();
+    runScenario();
   }
+
+  async function runScenario() {
+    var out = document.getElementById('scOut');
+    if (!fear.clients.length) { out.innerHTML = ''; return; }
+    var payload = {
+      c: document.getElementById('scC').value,
+      d: document.getElementById('scD').value,
+      belowMarket: document.getElementById('scBelow').checked
+    };
+    try {
+      var res = await fetch('/api/scenario', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) return;
+      renderScenario(await res.json());
+    } catch (e) { /* ignore */ }
+  }
+  function signed(n) { return (n >= 0 ? '+' : '−') + money(Math.abs(n)); }
+  function renderScenario(d) {
+    var revClass = d.revenue_delta > 0 ? 'pos' : (d.revenue_delta < 0 ? 'neg' : '');
+    var br = d.before.book_rate != null ? Math.round(d.before.book_rate) : null;
+    var ar = d.after.book_rate != null ? Math.round(d.after.book_rate) : null;
+    var rateClass = (ar != null && br != null && ar > br) ? 'pos' : '';
+    var valNow = Math.round((d.before.value_low + d.before.value_high) / 2);
+    var valAfter = Math.round((d.after.value_low + d.after.value_high) / 2);
+    var valDelta = valAfter - valNow;
+    var valClass = valDelta > 0 ? 'pos' : (valDelta < 0 ? 'neg' : '');
+    document.getElementById('scOut').innerHTML =
+      '<div class="sc-tile"><div class="sc-lbl">Revenue change</div><div class="sc-val ' + revClass + '">' + signed(d.revenue_delta) + '</div><div class="sc-sub">' + money(d.revenue_now) + ' → ' + money(d.revenue_after) + '</div></div>' +
+      '<div class="sc-tile"><div class="sc-lbl">Hours freed</div><div class="sc-val">' + Math.round(d.hours_freed) + '</div><div class="sc-sub">' + (d.dropped ? d.dropped + ' let go' : 'no goodbyes') + '</div></div>' +
+      '<div class="sc-tile"><div class="sc-lbl">Realized rate</div><div class="sc-val ' + rateClass + '">' + (ar != null ? '$' + ar + '/hr' : '—') + '</div><div class="sc-sub">' + (br != null ? 'from $' + br + '/hr' : '') + '</div></div>' +
+      '<div class="sc-tile"><div class="sc-lbl">Practice value</div><div class="sc-val ' + valClass + '">' + signed(valDelta) + '</div><div class="sc-sub">' + money(valNow) + ' → ' + money(valAfter) + '</div></div>';
+  }
+  ['scC', 'scD', 'scBelow'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', runScenario);
+  });
 
   function renderFear() {
     var empty = document.getElementById('fearEmpty');
