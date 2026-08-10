@@ -211,8 +211,10 @@ the whole book, which is the right model for firm-wide capacity and pricing call
   firm owner, so nothing breaks across the upgrade. `GET /api/team`, `POST
   /api/team/invite|uninvite|remove`.
 
-A per-client "managed by" tag ships in the schema (`client.owner_member_id`) for a
-follow-up that lets partners filter the shared book to their own clients.
+Each client can be tagged **managed by** a member (on the client card), and the portfolio
+has a **Mine** filter to narrow the shared book to your own clients. Both controls appear
+only once a firm has more than one member. Assignments are validated to real members of the
+firm; the book itself stays visible to everyone.
 
 ## Benchmarks (fees vs the market)
 

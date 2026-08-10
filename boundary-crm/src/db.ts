@@ -422,6 +422,16 @@ export interface ClientFields {
   est_hours: number | null;
   risk_level?: number | null;
   relationship_level?: number | null;
+  owner_member_id?: string | null;
+}
+
+/** Return the id only if it names a member of this firm; else null. */
+async function validMember(env: Env, firmId: string, memberId: string | null | undefined): Promise<string | null> {
+  if (!memberId) return null;
+  const row = await env.DB.prepare("SELECT 1 AS ok FROM member WHERE id = ? AND firm_id = ?")
+    .bind(memberId, firmId)
+    .first<{ ok: number }>();
+  return row ? memberId : null;
 }
 
 /** Recompute A-D tiers across a firm's whole book (after any add/edit/delete). */
@@ -451,16 +461,16 @@ export async function createClient(env: Env, firmId: string, f: ClientFields): P
     flags: null,
     risk_level: level(f.risk_level),
     relationship_level: level(f.relationship_level),
-    owner_member_id: null,
+    owner_member_id: await validMember(env, firmId, f.owner_member_id),
     created_at: Date.now(),
   };
   await env.DB.prepare(
-    `INSERT INTO client (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, risk_level, relationship_level, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO client (id, firm_id, name, email, entity_type, return_type, annual_fee, est_hours, realized_rate, tier, flags, risk_level, relationship_level, owner_member_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(client.id, firmId, client.name, client.email, client.entity_type, client.return_type,
       client.annual_fee, client.est_hours, client.realized_rate, client.tier, client.flags,
-      client.risk_level, client.relationship_level, client.created_at)
+      client.risk_level, client.relationship_level, client.owner_member_id, client.created_at)
     .run();
   await retierFirm(env, firmId);
   return (await getClient(env, firmId, client.id))!;
@@ -471,12 +481,13 @@ export async function updateClient(env: Env, firmId: string, id: string, f: Clie
   const existing = await getClient(env, firmId, id);
   if (!existing) return null;
   const rate = realizedRate(f.annual_fee, f.est_hours);
+  const ownerMember = await validMember(env, firmId, f.owner_member_id);
   await env.DB.prepare(
-    `UPDATE client SET name = ?, email = ?, entity_type = ?, return_type = ?, annual_fee = ?, est_hours = ?, realized_rate = ?, risk_level = ?, relationship_level = ?
+    `UPDATE client SET name = ?, email = ?, entity_type = ?, return_type = ?, annual_fee = ?, est_hours = ?, realized_rate = ?, risk_level = ?, relationship_level = ?, owner_member_id = ?
      WHERE id = ? AND firm_id = ?`
   )
     .bind(f.name, f.email, f.entity_type, f.return_type, f.annual_fee, f.est_hours, rate,
-      level(f.risk_level), level(f.relationship_level), id, firmId)
+      level(f.risk_level), level(f.relationship_level), ownerMember, id, firmId)
     .run();
   await retierFirm(env, firmId);
   return getClient(env, firmId, id);
