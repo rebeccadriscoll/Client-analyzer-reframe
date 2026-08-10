@@ -140,5 +140,8 @@ export interface Season {
   potential: number;
   tiers: string | null;
   actions: string | null;
+  gross_revenue: number | null;
+  book_rate: number | null;
+  clients: number | null;
   closed_at: number;
 }

@@ -677,6 +677,13 @@
   .next-card .nc-text { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; position: relative; z-index: 1; }
   .next-card .btn { position: relative; z-index: 1; }
 
+  .trends-card { margin-bottom: 22px; }
+  .trends-sub { font-size: 13px; color: var(--gray); margin: -4px 0 12px; }
+  #trendsTable td.latest, #trendsTable th { font-weight: 600; }
+  #trendsTable tr.latest-row td { background: var(--coral-soft); }
+  .trend-delta { font-size: 11px; font-weight: 700; margin-left: 5px; }
+  .trend-delta.up { color: var(--teal); }
+  .trend-delta.down { color: var(--coral-deep); }
   .attention-card { background: white; border: 1px solid var(--gray-light); border-left: 3px solid var(--coral); border-radius: 16px; padding: 18px 20px; margin-bottom: 22px; box-shadow: var(--shadow-sm); }
   .att-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
   .att-head h4 { font-family: 'Fraunces', serif; font-size: 17px; color: var(--navy); }
@@ -1118,6 +1125,16 @@
             <div class="home-card">
               <h4>Decisions</h4>
               <div id="homeDecisions"></div>
+            </div>
+          </div>
+          <div class="home-card trends-card" id="trendsCard" style="display:none;">
+            <h4>Season trends</h4>
+            <div class="trends-sub">How your book has moved across closed seasons, oldest to newest.</div>
+            <div class="ctable-wrap">
+              <table class="ctable" id="trendsTable">
+                <thead><tr><th>Season</th><th class="num">Clients</th><th class="num">Realized rate</th><th class="num">Committed</th><th class="num">Decisions</th></tr></thead>
+                <tbody></tbody>
+              </table>
             </div>
           </div>
           <div class="home-actions">
@@ -3060,7 +3077,44 @@
       if (!res.ok) return;
       renderOverview(await res.json());
       loadAttention();
+      loadSeasonTrends();
     } catch (e) { /* leave as-is */ }
+  }
+
+  async function loadSeasonTrends() {
+    try {
+      var res = await fetch('/api/seasons');
+      if (!res.ok) return;
+      renderTrends((await res.json()).seasons || []);
+    } catch (e) { /* ignore */ }
+  }
+  function renderTrends(seasons) {
+    var card = document.getElementById('trendsCard');
+    if (!seasons.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    // API returns newest-first; show oldest -> newest so it reads as a trajectory.
+    var rows = seasons.slice().reverse();
+    var delta = function (cur, prev, moneyFmt) {
+      if (cur == null || prev == null) return '';
+      var d = cur - prev;
+      if (Math.abs(d) < 0.5) return '';
+      var txt = (d > 0 ? '↑' : '↓') + (moneyFmt ? money(Math.abs(d)) : Math.round(Math.abs(d)));
+      return '<span class="trend-delta ' + (d > 0 ? 'up' : 'down') + '">' + txt + '</span>';
+    };
+    var html = rows.map(function (s, i) {
+      var prev = i > 0 ? rows[i - 1] : null;
+      var rate = s.book_rate != null ? '$' + Math.round(s.book_rate) + '/hr' : '—';
+      var rateD = prev ? delta(s.book_rate, prev.book_rate, false) : '';
+      var comD = prev ? delta(s.committed, prev.committed, true) : '';
+      var isLatest = i === rows.length - 1;
+      return '<tr' + (isLatest ? ' class="latest-row"' : '') + '>' +
+        '<td>' + esc(s.label) + '</td>' +
+        '<td class="num">' + (s.clients != null ? s.clients : '—') + '</td>' +
+        '<td class="num">' + rate + rateD + '</td>' +
+        '<td class="num">' + money(s.committed) + comD + '</td>' +
+        '<td class="num">' + s.decided + '</td></tr>';
+    }).join('');
+    document.querySelector('#trendsTable tbody').innerHTML = html;
   }
 
   async function loadAttention() {

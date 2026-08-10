@@ -528,6 +528,12 @@ async function handleSeasonClose(request: Request, env: Env): Promise<Response> 
     const c = byId.get(d.client_id);
     if (c && d.action !== "fire") potential += proposedFee(c, d);
   }
+  const grossRevenue = clients.reduce((s, c) => s + (c.annual_fee ?? 0), 0);
+  let feeSum = 0, hourSum = 0;
+  for (const c of clients) {
+    if (c.annual_fee != null && c.est_hours && c.est_hours > 0) { feeSum += c.annual_fee; hourSum += c.est_hours; }
+  }
+  const bookRate = hourSum > 0 ? feeSum / hourSum : null;
   const season = await closeSeason(env, firm.id, {
     label,
     decided: decisions.length,
@@ -535,6 +541,9 @@ async function handleSeasonClose(request: Request, env: Env): Promise<Response> 
     potential,
     tiers: tierCounts(clients),
     actions,
+    gross_revenue: grossRevenue,
+    book_rate: bookRate,
+    clients: clients.length,
   });
   return json({ season: { ...season, tiers: JSON.parse(season.tiers!), actions: JSON.parse(season.actions!) } });
 }
