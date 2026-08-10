@@ -46,6 +46,7 @@ import { generateWords } from "./words";
 import { buildHandoffPacket } from "./handoff";
 import { computeValuation } from "./valuation";
 import { adviseGrow } from "./grow";
+import { computeBenchmarks } from "./benchmarks";
 import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
@@ -171,6 +172,9 @@ export default {
       }
       if (pathname === "/api/grow" && request.method === "GET") {
         return await handleGrow(request, env);
+      }
+      if (pathname === "/api/benchmarks" && request.method === "GET") {
+        return await handleBenchmarks(request, env);
       }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
@@ -650,6 +654,14 @@ async function handleValuation(request: Request, env: Env): Promise<Response> {
   if (!firm) return json({ error: "unauthorized" }, 401);
   const clients = await listClients(env, firm.id);
   return json(computeValuation(clients, firm.target_rate));
+}
+
+/** GET /api/benchmarks — each client's fee vs a market range for its service. */
+async function handleBenchmarks(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const clients = await listClients(env, firm.id);
+  return json({ ...computeBenchmarks(clients), clients: clients.length });
 }
 
 /** GET /api/grow — advisory-upsell candidates + the inputs to price a new prospect. */
