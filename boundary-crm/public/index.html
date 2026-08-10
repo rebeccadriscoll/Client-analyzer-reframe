@@ -661,6 +661,16 @@
   .next-card .nc-text { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; position: relative; z-index: 1; }
   .next-card .btn { position: relative; z-index: 1; }
 
+  .attention-card { background: white; border: 1px solid var(--gray-light); border-left: 3px solid var(--coral); border-radius: 16px; padding: 18px 20px; margin-bottom: 22px; box-shadow: var(--shadow-sm); }
+  .att-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+  .att-head h4 { font-family: 'Fraunces', serif; font-size: 17px; color: var(--navy); }
+  .att-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--coral); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .att-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(31,58,61,0.07); }
+  .att-row:last-child { border-bottom: none; }
+  .att-count { font-family: 'Fraunces', serif; font-weight: 700; color: var(--coral-deep); font-size: 18px; min-width: 34px; }
+  .att-label { flex: 1; font-size: 14px; color: var(--navy); }
+  .att-go { background: none; border: 1px solid var(--gray-light); color: var(--gray); font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 100px; cursor: pointer; font-family: 'Inter'; }
+  .att-go:hover { border-color: var(--coral); color: var(--coral-deep); }
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
   @media (max-width: 720px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
   .stat-tile { background: white; border-radius: 16px; padding: 20px; box-shadow: var(--shadow-sm); border: 1px solid rgba(31,58,61,0.08); }
@@ -906,6 +916,7 @@
   .np-out .verdict { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 100px; }
   .np-out .verdict.good { background: rgba(45,106,107,0.12); color: var(--teal); }
   .np-out .verdict.warn { background: var(--coral-soft); color: var(--coral-deep); }
+  .np-add { margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--gray-light); }
   .grow-cands { margin-top: 24px; }
   .grow-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
   .grow-head h4 { font-family: 'Fraunces', serif; font-size: 18px; color: var(--navy); }
@@ -1070,6 +1081,10 @@
               <div class="nc-text" id="nextText">—</div>
             </div>
             <button class="btn btn-primary" id="nextBtn">Take me there</button>
+          </div>
+          <div class="attention-card" id="attentionCard" style="display:none;">
+            <div class="att-head"><span class="att-dot">!</span><h4>Needs attention</h4></div>
+            <div id="attentionList"></div>
           </div>
           <div class="stat-grid">
             <div class="stat-tile"><div class="lbl">Clients</div><div class="val" id="stClients">0</div><div class="sub" id="stDecided">0 decided</div></div>
@@ -1349,6 +1364,14 @@
               <div class="np-field"><label>Proposed fee <span class="lbl-hint">optional</span></label><input id="npFee" type="text" inputmode="numeric" placeholder="test a number" /></div>
             </div>
             <div class="np-out" id="npOut"></div>
+            <div class="np-add" id="npAdd" style="display:none;">
+              <div class="np-row">
+                <div class="np-field"><label>Client name</label><input id="npName" type="text" placeholder="New client name" /></div>
+                <div class="np-field"><label>Entity <span class="lbl-hint">optional</span></label><input id="npEntity" type="text" placeholder="S-Corp, LLC…" /></div>
+                <div class="np-field"><label>Return <span class="lbl-hint">optional</span></label><input id="npReturn" type="text" placeholder="1120-S…" /></div>
+              </div>
+              <button class="btn btn-primary btn-sm" id="npAddBtn" style="margin-top:12px;">Add to book</button>
+            </div>
           </div>
           <div class="grow-cands">
             <div class="grow-head">
@@ -2968,7 +2991,33 @@
       var res = await fetch('/api/overview');
       if (!res.ok) return;
       renderOverview(await res.json());
+      loadAttention();
     } catch (e) { /* leave as-is */ }
+  }
+
+  async function loadAttention() {
+    try {
+      var res = await fetch('/api/attention');
+      if (!res.ok) return;
+      renderAttention(await res.json());
+    } catch (e) { /* ignore */ }
+  }
+  function renderAttention(d) {
+    var card = document.getElementById('attentionCard');
+    var items = d.items || [];
+    if (!items.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    document.getElementById('attentionList').innerHTML = items.map(function (it) {
+      return '<div class="att-row"><span class="att-count">' + it.count + '</span>' +
+        '<span class="att-label">' + esc(it.label) + '</span>' +
+        '<button class="att-go" data-tab="' + it.tab + '">Review</button></div>';
+    }).join('');
+    document.querySelectorAll('#attentionList .att-go').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var tab = b.getAttribute('data-tab');
+        showTab(tab, document.querySelectorAll('.tabnav button')[TAB_INDEX[tab] || 0]);
+      });
+    });
   }
 
   function tierBar(label, n, total, color, labelWidth) {
@@ -3321,7 +3370,13 @@
       : (growState.book ? 'No target set, so priced to your book average of $' + Math.round(growState.book) + '/hr. Set a target in Settings.' : 'Set a target realized rate in Settings to price prospects.');
     var hours = parseNum(document.getElementById('npHours').value);
     var fee = parseNum(document.getElementById('npFee').value);
-    if (!hours || hours <= 0) { out.innerHTML = ''; return; }
+    growState.addHours = null; growState.addFee = null;
+    var addBox = document.getElementById('npAdd');
+    if (!hours || hours <= 0) { out.innerHTML = ''; addBox.style.display = 'none'; return; }
+    var suggestedFee = bench > 0 ? Math.max(Math.ceil(bench * hours / 50) * 50, growState.min || 0) : null;
+    var useFee = (fee && fee > 0) ? fee : suggestedFee;
+    if (useFee != null) { growState.addHours = hours; growState.addFee = useFee; addBox.style.display = 'block'; }
+    else { addBox.style.display = 'none'; }
     if (fee && fee > 0) {
       var rate = fee / hours;
       var msg = '<span class="big">$' + Math.round(rate) + '/hr</span> at ' + money(fee) + ' for ' + hours + ' hours.';
@@ -3343,6 +3398,34 @@
   }
   document.getElementById('npHours').addEventListener('input', renderProspect);
   document.getElementById('npFee').addEventListener('input', renderProspect);
+  async function addProspect() {
+    var name = document.getElementById('npName').value.trim();
+    if (!name) { document.getElementById('npName').focus(); return; }
+    if (growState.addFee == null || growState.addHours == null) return;
+    var btn = document.getElementById('npAddBtn'); btn.disabled = true; btn.textContent = 'Adding…';
+    try {
+      var res = await fetch('/api/clients/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          entity_type: document.getElementById('npEntity').value.trim(),
+          return_type: document.getElementById('npReturn').value.trim(),
+          annual_fee: growState.addFee,
+          est_hours: growState.addHours
+        })
+      });
+      if (res.ok) {
+        var d = await res.json();
+        if (d.clients) renderPortfolio(d.clients, countTiers(d.clients));
+        loadOverview();
+        flashOk(name + ' added to your book at ' + money(growState.addFee) + '.');
+        ['npName', 'npEntity', 'npReturn', 'npHours', 'npFee'].forEach(function (id) { document.getElementById(id).value = ''; });
+        renderProspect();
+      } else { flash('Could not add that client. Please try again.'); }
+    } catch (e) { flash('Could not add that client. Please try again.'); }
+    btn.disabled = false; btn.textContent = 'Add to book';
+  }
+  document.getElementById('npAddBtn').addEventListener('click', addProspect);
 
   // ---- benchmarks (fees vs market) ----
   async function loadBench() {
