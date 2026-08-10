@@ -18,11 +18,36 @@ export function tierForRank(rankPct: number): Tier {
 }
 
 /**
- * Assign tiers to a set by realized-rate percentile. Items without a realized
- * rate stay null (unranked). Tiers are relative to the set being ranked, which
- * matches the analyzer's "top 20% / bottom 20%" framing.
+ * Grade a single realized rate against a firm's target rate ($/hr). This is the
+ * honest, absolute view: "D" means genuinely below what the work needs to earn,
+ * not merely the bottom of this particular book.
+ *   A >= 1.25x target, B >= target, C >= 0.6x target, else D.
  */
-export function computeTiers<T>(items: T[], getRate: (item: T) => number | null): (Tier | null)[] {
+export function tierForRate(rate: number, target: number): Tier {
+  if (rate >= target * 1.25) return "A";
+  if (rate >= target) return "B";
+  if (rate >= target * 0.6) return "C";
+  return "D";
+}
+
+/**
+ * Assign tiers to a set. With a positive `target`, each client is graded against
+ * that absolute target rate (a book of all-strong clients can be all A/B). Without
+ * one, it falls back to realized-rate percentile within the set (top 20% / bottom
+ * 20%). Items without a realized rate stay null (unranked).
+ */
+export function computeTiers<T>(
+  items: T[],
+  getRate: (item: T) => number | null,
+  target?: number | null
+): (Tier | null)[] {
+  if (target != null && target > 0) {
+    return items.map((item) => {
+      const rate = getRate(item);
+      return rate == null ? null : tierForRate(rate, target);
+    });
+  }
+
   const valid = items
     .map((item, i) => ({ i, rate: getRate(item) }))
     .filter((x): x is { i: number; rate: number } => x.rate != null)

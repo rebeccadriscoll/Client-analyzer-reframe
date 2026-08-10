@@ -22,6 +22,8 @@ import {
   updateSettings,
   listSeasons,
   closeSeason,
+  getTargetRate,
+  retierFirm,
   type ClientFields,
   getDecisions,
   upsertDecision,
@@ -42,6 +44,7 @@ import {
 import type { Action, WaveType, WaveStatus, CommitmentState } from "./types";
 import { generateWords } from "./words";
 import { buildHandoffPacket } from "./handoff";
+import { computeValuation } from "./valuation";
 import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
@@ -162,6 +165,9 @@ export default {
       if (pathname === "/api/handoffs" && request.method === "GET") {
         return await handleHandoffs(request, env);
       }
+      if (pathname === "/api/valuation" && request.method === "GET") {
+        return await handleValuation(request, env);
+      }
       // Any other /api/* path is a real 404, not the HTML shell.
       if (pathname.startsWith("/api/")) {
         return json({ error: "not_found" }, 404);
@@ -223,7 +229,7 @@ async function handleMe(request: Request, env: Env): Promise<Response> {
   if (!firm) return json({ authenticated: false }, 401);
   return json({
     authenticated: true,
-    firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size },
+    firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size, target_rate: firm.target_rate },
   });
 }
 
@@ -259,6 +265,11 @@ function parseClientFields(b: Record<string, unknown>): ClientFields | null {
     const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.\-]/g, ""));
     return Number.isFinite(n) ? n : null;
   };
+  const lvl = (v: unknown) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) && n >= 1 && n <= 3 ? Math.round(n) : null;
+  };
   return {
     name,
     email: str(b.email),
@@ -266,6 +277,8 @@ function parseClientFields(b: Record<string, unknown>): ClientFields | null {
     return_type: str(b.return_type),
     annual_fee: num(b.annual_fee),
     est_hours: num(b.est_hours),
+    risk_level: lvl(b.risk_level),
+    relationship_level: lvl(b.relationship_level),
   };
 }
 
@@ -344,7 +357,7 @@ async function handleNotesAdd(request: Request, env: Env): Promise<Response> {
 async function handleSettingsGet(request: Request, env: Env): Promise<Response> {
   const firm = await firmFromRequest(request, env);
   if (!firm) return json({ error: "unauthorized" }, 401);
-  return json({ firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size } });
+  return json({ firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size, target_rate: firm.target_rate } });
 }
 
 /** POST /api/settings { name?, min_fee?, batch_size? } — save firm settings. */
@@ -362,8 +375,13 @@ async function handleSettingsSave(request: Request, env: Env): Promise<Response>
   const min_fee = numOrNull(body.min_fee);
   const bsRaw = numOrNull(body.batch_size);
   const batch_size = bsRaw != null ? Math.max(1, Math.round(bsRaw)) : null;
-  const updated = await updateSettings(env, firm.id, { name, min_fee, batch_size });
-  return json({ firm: { email: updated.owner_email, name: updated.name, min_fee: updated.min_fee, batch_size: updated.batch_size } });
+  const trRaw = numOrNull(body.target_rate);
+  const target_rate = trRaw != null && trRaw > 0 ? trRaw : null;
+  const changedTarget = target_rate !== firm.target_rate;
+  const updated = await updateSettings(env, firm.id, { name, min_fee, batch_size, target_rate });
+  // The target rate changes how the whole book grades, so re-tier when it moves.
+  if (changedTarget) await retierFirm(env, firm.id);
+  return json({ firm: { email: updated.owner_email, name: updated.name, min_fee: updated.min_fee, batch_size: updated.batch_size, target_rate: updated.target_rate } });
 }
 
 /** GET /api/seasons — past closed seasons. */
@@ -444,6 +462,15 @@ async function handleOverview(request: Request, env: Env): Promise<Response> {
     (c) => c.state === "told" && now - c.updated_at > SILENT_DAYS * 86400000
   ).length;
   const bookRevenue = clients.reduce((s, c) => s + (c.annual_fee ?? 0), 0);
+  const bookHours = clients.reduce((s, c) => s + (c.est_hours ?? 0), 0);
+  // Capacity lens: hours handed back by the goodbyes (the scarcest resource).
+  let freedHours = 0;
+  for (const d of decisions) {
+    if (d.action === "fire") {
+      const c = byId.get(d.client_id);
+      if (c && c.est_hours) freedHours += c.est_hours;
+    }
+  }
   const p = (n: number) => (n === 1 ? "" : "s");
 
   let next: { label: string; tab: string };
@@ -467,6 +494,8 @@ async function handleOverview(request: Request, env: Env): Promise<Response> {
     potential,
     silent,
     bookRevenue,
+    bookHours,
+    freedHours,
     contacted: commitments.length,
     next,
   });
@@ -560,7 +589,8 @@ async function handleImportCommit(request: Request, env: Env): Promise<Response>
 
   if (staged.length === 0) return json({ error: "no_rows", skipped }, 400);
 
-  const tiers = computeTiers(staged, (c) => c.realized_rate);
+  const target = await getTargetRate(env, firm.id);
+  const tiers = computeTiers(staged, (c) => c.realized_rate, target);
   staged.forEach((c, i) => (c.tier = tiers[i]));
 
   if (b.replace === true) await deleteClientsForFirm(env, firm.id);
@@ -608,6 +638,14 @@ async function handleHandoffs(request: Request, env: Env): Promise<Response> {
     .filter((c) => decByClient.get(c.id)?.action === "fire")
     .map((c) => buildHandoffPacket(firmName, c));
   return json({ packets, count: packets.length });
+}
+
+/** GET /api/valuation — a rough practice-value estimate + grooming levers. */
+async function handleValuation(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const clients = await listClients(env, firm.id);
+  return json(computeValuation(clients, firm.target_rate));
 }
 
 const ACTIONS: Action[] = ["keep", "raise", "fire", "nudge"];

@@ -702,6 +702,10 @@
   .mfield label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray); margin-bottom: 5px; }
   .mfield input { width: 100%; padding: 11px 12px; font-size: 15px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; }
   .mfield input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .tier-note { font-size: 12px; color: var(--gray); margin-bottom: 12px; margin-top: -4px; }
+  .mfield select { width: 100%; padding: 11px 12px; font-size: 15px; font-family: 'Inter'; color: var(--navy); border: 1.5px solid var(--gray-light); border-radius: 10px; background: white; outline: none; cursor: pointer; }
+  .mfield select:focus { border-color: var(--coral); box-shadow: 0 0 0 3px var(--coral-soft); }
+  .mfield label .lbl-hint { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray); margin-left: 4px; }
   .modal-meta { font-size: 13px; color: var(--gray); margin: 10px 0 4px; }
   .modal-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
   .modal-actions .spacer { flex: 1; }
@@ -868,6 +872,25 @@
   .ho-text:focus { outline: none; border-color: var(--coral); }
   .ho-actions { display: flex; gap: 8px; margin-top: 10px; }
   .ho-empty { font-size: 14px; color: var(--gray); font-style: italic; padding: 8px 0 16px; }
+
+  /* ===== GROOM FOR SALE ===== */
+  .val-hero {
+    background: var(--navy); color: white; border-radius: 20px; padding: 28px 30px;
+    margin-bottom: 22px; box-shadow: var(--shadow-md);
+  }
+  .val-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--yellow); margin-bottom: 8px; }
+  .val-range { font-family: 'Fraunces', serif; font-size: clamp(30px, 5vw, 44px); font-weight: 700; line-height: 1.05; }
+  .val-sub { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 8px; }
+  .val-note { font-size: 12px; color: var(--gray); margin-top: 18px; line-height: 1.55; }
+  .lever { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid rgba(31,58,61,0.08); }
+  .lever:last-child { border-bottom: none; }
+  .lever-dot { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; margin-top: 1px; }
+  .lever-dot.lift { background: var(--coral-soft); color: var(--coral-deep); }
+  .lever-dot.strength { background: rgba(45,106,107,0.12); color: var(--teal); }
+  .lever-dot.clean { background: var(--cream-deep); color: var(--gray); }
+  .lever-body .lv-title { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+  .lever-body .lv-detail { font-size: 13px; color: var(--gray); line-height: 1.5; }
+  .lever-none { font-size: 14px; color: var(--gray); font-style: italic; }
 </style>
 </head>
 <body>
@@ -881,14 +904,14 @@
     <div class="landing">
       <div class="pitch">
         <div class="gate-mark">B</div>
-        <span class="hero-eyebrow">For solo and small-firm accountants</span>
-        <h1 class="pitch-h">Decide who to keep, raise, nudge, and <em>let go.</em></h1>
-        <p class="pitch-sub">Boundary CRM turns your client list into clear calls. It scores every client, sorts them A to D, and drafts the message for each one, so you can re-price your book without the dread.</p>
+        <span class="hero-eyebrow">The pricing &amp; capacity OS for accounting firms</span>
+        <h1 class="pitch-h">Price, keep, grow, or let go. <em>Every client, every year.</em></h1>
+        <p class="pitch-sub">Boundary is the operating system for your book: the thing that decides how every client, and every new prospect, gets priced, kept, grown, or let go. Every year.</p>
         <ul class="pitch-list">
-          <li>Score each client by realized rate and sort them A to D.</li>
-          <li>Work in small batches, one client at a time.</li>
-          <li>Draft the message in your voice. You send it from your own inbox.</li>
-          <li>Nothing is ever sent or changed without you.</li>
+          <li>Score every client against your target rate and grade them A to D.</li>
+          <li>Keep, raise, nudge, or let go, with the reason shown.</li>
+          <li>Grow your best-fit clients and price new prospects right.</li>
+          <li>See the hours you free, then groom the whole book into an asset you could sell.</li>
         </ul>
         <p class="pitch-foot">Grows out of the free Client Analyzer. Your client list stays private to your firm.</p>
       </div>
@@ -939,7 +962,7 @@
       </header>
 
       <div class="hero">
-        <span class="hero-eyebrow">Import · Decide · Say the words · Roll out</span>
+        <span class="hero-eyebrow">Price · Keep · Grow · Let go · Groom for sale</span>
         <h2>Decide who to keep, raise, nudge, and <em>let go.</em></h2>
         <p class="hero-sub">Bring your clients in, work through them in small batches, and let the tool draft the message for each call. One client at a time.</p>
       </div>
@@ -952,6 +975,7 @@
         <button onclick="showTab('rollout', this)"><span class="num">④</span> Rollout</button>
         <button onclick="showTab('tracker', this)"><span class="num">⑤</span> Tracker</button>
         <button onclick="showTab('fear', this)"><span class="num">⑥</span> Fear Killer</button>
+        <button onclick="showTab('groom', this)"><span class="num">$</span> Groom for sale</button>
       </nav>
 
       <div class="sample-banner" id="sampleBanner" style="display:none;">
@@ -994,12 +1018,14 @@
           <div class="stat-grid">
             <div class="stat-tile"><div class="lbl">Clients</div><div class="val" id="stClients">0</div><div class="sub" id="stDecided">0 decided</div></div>
             <div class="stat-tile"><div class="lbl">Committed revenue</div><div class="val" id="stCommitted">$0</div><div class="sub" id="stPotential">of $0 on the table</div></div>
+            <div class="stat-tile"><div class="lbl">Hours freed</div><div class="val" id="stHours">0</div><div class="sub" id="stHoursSub">from goodbyes</div></div>
             <div class="stat-tile"><div class="lbl">Book revenue</div><div class="val" id="stBook">$0</div><div class="sub">current annual fees</div></div>
             <div class="stat-tile"><div class="lbl">Needs follow-up</div><div class="val" id="stSilent">0</div><div class="sub">silent 7+ days</div></div>
           </div>
           <div class="home-cols">
             <div class="home-card">
               <h4>Tier mix</h4>
+              <div class="tier-note" id="homeTierNote"></div>
               <div id="homeTiers"></div>
             </div>
             <div class="home-card">
@@ -1242,6 +1268,41 @@
         </div>
       </div>
 
+      <!-- 7. GROOM FOR SALE -->
+      <div class="panel" id="panel-groom">
+        <div class="section-header">
+          <div>
+            <span class="section-num">Asset</span>
+            <div class="section-title">Groom your book for sale</div>
+          </div>
+          <p class="section-help">Your book is a sellable asset. Here is roughly what it is worth, and what lifts the price.</p>
+        </div>
+        <div id="groomEmpty" class="placeholder" style="display:none;">
+          <div class="icon">💎</div>
+          <h3>Import your clients first</h3>
+          <p>Once your book is in, this values it as an asset and shows what a buyer would pay more for.</p>
+          <button class="btn btn-primary" style="margin-top:18px;" onclick="showTab('import', document.querySelectorAll('.tabnav button')[1])">Go to import</button>
+        </div>
+        <div id="groomMain" style="display:none;">
+          <div class="val-hero">
+            <div class="val-label">Estimated practice value</div>
+            <div class="val-range" id="valRange">—</div>
+            <div class="val-sub" id="valSub"></div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-tile"><div class="lbl">Recurring revenue</div><div class="val" id="valGross">$0</div><div class="sub">annual fees on the book</div></div>
+            <div class="stat-tile"><div class="lbl">Book realized rate</div><div class="val" id="valRate">—</div><div class="sub" id="valRateSub">weighted $/hr</div></div>
+            <div class="stat-tile"><div class="lbl">Top-client concentration</div><div class="val" id="valConc">—</div><div class="sub" id="valConcSub">largest single client</div></div>
+            <div class="stat-tile"><div class="lbl">A / B share</div><div class="val" id="valAB">—</div><div class="sub">of your ranked book</div></div>
+          </div>
+          <div class="home-card" style="margin-top:20px;">
+            <h4>What lifts the price</h4>
+            <div id="valLevers"></div>
+          </div>
+          <p class="val-note">A rough estimate from your own book, not a formal appraisal. Small firms often trade near 0.6x to 1.3x annual recurring revenue; the multiple moves with realization, client mix, and how concentrated your revenue is.</p>
+        </div>
+      </div>
+
       <footer>
         <div>Boundary CRM · Phase 0 preview</div>
         <div>Free on-ramp: <a href="/" onclick="return false;">The Client Analyzer</a></div>
@@ -1331,6 +1392,10 @@
         <div class="mfield"><label>Return type</label><input id="cmReturn" type="text" placeholder="1120-S, 1040…" /></div>
         <div class="mfield"><label>Annual fee</label><input id="cmFee" type="text" inputmode="numeric" placeholder="0" /></div>
         <div class="mfield"><label>Estimated hours</label><input id="cmHours" type="text" inputmode="numeric" placeholder="0" /></div>
+        <div class="mfield"><label>Risk / pain <span class="lbl-hint">cost beyond the fee</span></label>
+          <select id="cmRisk"><option value="">Not set</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option></select></div>
+        <div class="mfield"><label>Relationship <span class="lbl-hint">value beyond the fee</span></label>
+          <select id="cmRel"><option value="">Not set</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option></select></div>
       </div>
       <div class="modal-meta" id="cmMeta"></div>
       <div class="modal-actions">
@@ -1359,10 +1424,11 @@
       </div>
       <div class="field-grid">
         <div class="mfield full"><label>Firm name</label><input id="setName" type="text" placeholder="Your firm name" /></div>
+        <div class="mfield"><label>Target realized rate ($/hr)</label><input id="setTarget" type="text" inputmode="numeric" placeholder="e.g. 200" /></div>
         <div class="mfield"><label>Minimum fee</label><input id="setMinFee" type="text" inputmode="numeric" placeholder="0" /></div>
         <div class="mfield"><label>Default batch size</label><input id="setBatch" type="text" inputmode="numeric" placeholder="5" /></div>
       </div>
-      <div class="modal-meta">The minimum fee floors your raise suggestions and the Fear Killer. Batch size sets how many clients you work at a time.</div>
+      <div class="modal-meta">Your target realized rate is what an hour of your work should earn. Set it and tiers grade against it, so D means genuinely below target, not just the bottom of your book. The minimum fee floors your raise suggestions and the Fear Killer. Batch size sets how many clients you work at a time.</div>
       <div class="modal-actions">
         <span class="spacer"></span>
         <button class="btn btn-ghost" id="setCancel">Cancel</button>
@@ -1432,8 +1498,9 @@
     if (id === 'rollout' || id === 'tracker') loadRollout();
     if (id === 'fear') loadFear();
     if (id === 'home') loadOverview();
+    if (id === 'groom') loadGroom();
   }
-  var TAB_INDEX = { home: 0, import: 1, decide: 2, words: 3, rollout: 4, tracker: 5, fear: 6 };
+  var TAB_INDEX = { home: 0, import: 1, decide: 2, words: 3, rollout: 4, tracker: 5, fear: 6, groom: 7 };
 
   // ---- auth flow ----
   var gate = document.getElementById('gate');
@@ -1485,13 +1552,14 @@
     });
   };
 
-  var firmSettings = { name: null, min_fee: null, batch_size: null };
+  var firmSettings = { name: null, min_fee: null, batch_size: null, target_rate: null };
 
   function applySettings(firm) {
     if (!firm) return;
     firmSettings.name = firm.name;
     firmSettings.min_fee = firm.min_fee;
     firmSettings.batch_size = firm.batch_size;
+    firmSettings.target_rate = firm.target_rate;
     document.getElementById('brandTag').textContent = firm.name || 'Your firm';
     if (firm.batch_size) {
       var sel = document.getElementById('batchSize');
@@ -1933,11 +2001,15 @@
 
   function clientFlags(c) {
     var f = [];
-    if (c.realized_rate == null) { f.push('No fee or hours on file yet'); return f; }
-    if (c.tier === 'A') f.push('Top tier by realized rate — worth protecting');
-    if (c.tier === 'D') f.push('Bottom tier by realized rate');
-    if (dec.avgRate > 0 && c.realized_rate < dec.avgRate) f.push('Below your book average of $' + Math.round(dec.avgRate) + '/hr');
-    else if (dec.avgRate > 0) f.push('At or above your book average');
+    if (c.realized_rate == null) f.push('No fee or hours on file yet');
+    else {
+      if (c.tier === 'A') f.push('Top tier by realized rate — worth protecting');
+      if (c.tier === 'D') f.push(firmSettings.target_rate ? 'Below your $' + Math.round(firmSettings.target_rate) + '/hr target' : 'Bottom tier by realized rate');
+      if (dec.avgRate > 0 && c.realized_rate < dec.avgRate) f.push('Below your book average of $' + Math.round(dec.avgRate) + '/hr');
+      else if (dec.avgRate > 0) f.push('At or above your book average');
+    }
+    if ((c.risk_level || 0) >= 3) f.push('High risk or pain beyond the fee');
+    if ((c.relationship_level || 0) >= 3) f.push('High-value relationship (referrals, tenure, growth)');
     return f;
   }
 
@@ -1954,18 +2026,28 @@
   function suggestAction(c, feel) {
     var t = c.tier;
     var base = (t === 'A' || t === 'B') ? 'keep' : (t === 'C') ? 'raise' : (t === 'D') ? 'raise' : 'keep';
-    if (feel === 'Dread') return (t === 'A' || t === 'B') ? 'raise' : 'fire';
-    if (feel === 'Drained') return base === 'keep' ? 'nudge' : base;
-    if (feel === 'Glad') return 'keep';
+    if (feel === 'Dread') base = (t === 'A' || t === 'B') ? 'raise' : 'fire';
+    else if (feel === 'Drained') base = base === 'keep' ? 'nudge' : base;
+    else if (feel === 'Glad') base = 'keep';
+    // Multi-factor: risk and relationship bend the call beyond the rate alone.
+    var risk = c.risk_level || 0, rel = c.relationship_level || 0;
+    if (rel >= 3 && base === 'fire') base = 'nudge';                 // a valued relationship is worth trying to save
+    if (risk >= 3 && base === 'keep') base = 'nudge';                // high pain: set boundaries even on a keeper
+    if (risk >= 3 && t === 'D' && rel < 3 && base === 'raise') base = 'fire'; // thin, painful, not valued
     return base;
   }
 
   function suggestReason(c, feel, action) {
-    if (action === 'keep') return 'Strong economics' + (feel === 'Glad' ? ' and you like the work.' : '.');
-    if (action === 'raise') return (c.tier === 'C' || c.tier === 'D') ? 'The rate is thin for the hours.' : 'Room to price this closer to your better clients.';
-    if (action === 'fire') return 'Low rate and it wears on you. The book has room for better.';
-    if (action === 'nudge') return 'Worth keeping if the fit improves.';
-    return '';
+    var risk = c.risk_level || 0, rel = c.relationship_level || 0;
+    var base;
+    if (action === 'keep') base = 'Strong economics' + (feel === 'Glad' ? ' and you like the work.' : '.');
+    else if (action === 'raise') base = (c.tier === 'C' || c.tier === 'D') ? 'The rate is thin for the hours.' : 'Room to price this closer to your better clients.';
+    else if (action === 'fire') base = 'Low rate and it wears on you. The book has room for better.';
+    else if (action === 'nudge') base = 'Worth keeping if the fit improves.';
+    else base = '';
+    if (rel >= 3 && action !== 'fire') base += ' A valued relationship, so protect it.';
+    else if (risk >= 3) base += ' They cost you beyond the fee, so tighten the terms.';
+    return base;
   }
 
   function suggestFee(c, avg) {
@@ -2749,6 +2831,16 @@
     document.getElementById('stPotential').textContent = 'of ' + money(d.potential) + ' on the table';
     document.getElementById('stBook').textContent = money(d.bookRevenue);
     document.getElementById('stSilent').textContent = d.silent;
+    var freed = Math.round(d.freedHours || 0);
+    document.getElementById('stHours').textContent = freed ? freed : '0';
+    document.getElementById('stHoursSub').textContent = freed
+      ? 'back from ' + (d.actions.fire || 0) + ' goodbye' + ((d.actions.fire || 0) === 1 ? '' : 's')
+      : 'from goodbyes';
+
+    var note = document.getElementById('homeTierNote');
+    if (note) note.textContent = firmSettings.target_rate
+      ? 'Graded against your $' + Math.round(firmSettings.target_rate) + '/hr target'
+      : 'Ranked within your book. Set a target rate in Settings to grade absolutely.';
 
     var tc = { A: 'var(--tier-a)', B: 'var(--tier-b)', C: 'var(--tier-c)', D: 'var(--tier-d)' };
     var ht = ['A', 'B', 'C', 'D'].map(function (t) { return tierBar(t, d.tiers[t] || 0, d.clients, tc[t], '18px'); }).join('');
@@ -2968,6 +3060,39 @@
     setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
   }
 
+  // ---- groom for sale (practice value) ----
+  async function loadGroom() {
+    try {
+      var res = await fetch('/api/valuation');
+      if (!res.ok) return;
+      renderGroom(await res.json());
+    } catch (e) { /* leave as-is */ }
+  }
+  function renderGroom(v) {
+    var empty = document.getElementById('groomEmpty'), main = document.getElementById('groomMain');
+    if (!v.clients) { empty.style.display = 'block'; main.style.display = 'none'; return; }
+    empty.style.display = 'none'; main.style.display = 'block';
+    var pct = function (x) { return Math.round((x || 0) * 100) + '%'; };
+    document.getElementById('valRange').textContent = money(v.value_low) + ' – ' + money(v.value_high);
+    document.getElementById('valSub').textContent = '≈ ' + (v.multiple).toFixed(2) + 'x recurring revenue';
+    document.getElementById('valGross').textContent = money(v.gross_revenue);
+    document.getElementById('valRate').textContent = v.book_rate != null ? '$' + Math.round(v.book_rate) + '/hr' : '—';
+    document.getElementById('valRateSub').textContent = v.target_rate ? 'vs $' + Math.round(v.target_rate) + '/hr target' : 'weighted $/hr';
+    document.getElementById('valConc').textContent = v.concentration.top1_pct ? pct(v.concentration.top1_pct) : '—';
+    document.getElementById('valConcSub').textContent = v.concentration.top_client ? v.concentration.top_client : 'largest single client';
+    document.getElementById('valAB').textContent = pct(v.ab_share);
+    var el = document.getElementById('valLevers');
+    if (!v.levers.length) {
+      el.innerHTML = '<div class="lever-none">Your book is in good shape. Keep realized rate up and revenue spread across clients.</div>';
+    } else {
+      var icon = { lift: '↑', strength: '★', clean: '✓' };
+      el.innerHTML = v.levers.map(function (l) {
+        return '<div class="lever"><div class="lever-dot ' + l.kind + '">' + (icon[l.kind] || '•') + '</div>' +
+          '<div class="lever-body"><div class="lv-title">' + esc(l.title) + '</div><div class="lv-detail">' + esc(l.detail) + '</div></div></div>';
+      }).join('');
+    }
+  }
+
   document.getElementById('reportBtn').addEventListener('click', printReport);
   document.getElementById('exportBtn').addEventListener('click', exportCsv);
   document.getElementById('exportDecBtn').addEventListener('click', exportDecisions);
@@ -2988,6 +3113,8 @@
     document.getElementById('cmReturn').value = client && client.return_type ? client.return_type : '';
     document.getElementById('cmFee').value = client && client.annual_fee != null ? client.annual_fee : '';
     document.getElementById('cmHours').value = client && client.est_hours != null ? client.est_hours : '';
+    document.getElementById('cmRisk').value = client && client.risk_level != null ? String(client.risk_level) : '';
+    document.getElementById('cmRel').value = client && client.relationship_level != null ? String(client.relationship_level) : '';
     var meta = document.getElementById('cmMeta');
     meta.textContent = client
       ? ('Tier ' + (client.tier || '—') + ' · realized rate ' + (client.realized_rate != null ? '$' + Math.round(client.realized_rate) + '/hr' : '—'))
@@ -3018,7 +3145,9 @@
       entity_type: document.getElementById('cmEntity').value,
       return_type: document.getElementById('cmReturn').value,
       annual_fee: document.getElementById('cmFee').value,
-      est_hours: document.getElementById('cmHours').value
+      est_hours: document.getElementById('cmHours').value,
+      risk_level: document.getElementById('cmRisk').value || null,
+      relationship_level: document.getElementById('cmRel').value || null
     };
     if (!payload.name.trim()) { document.getElementById('cmName').focus(); return; }
     var btn = document.getElementById('cmSave'); btn.disabled = true; btn.textContent = 'Saving…';
@@ -3099,6 +3228,7 @@
 
   function openSettings() {
     document.getElementById('setName').value = firmSettings.name || '';
+    document.getElementById('setTarget').value = firmSettings.target_rate != null ? firmSettings.target_rate : '';
     document.getElementById('setMinFee').value = firmSettings.min_fee != null ? firmSettings.min_fee : '';
     document.getElementById('setBatch').value = firmSettings.batch_size != null ? firmSettings.batch_size : '';
     document.getElementById('seasonLabel').value = '';
@@ -3111,13 +3241,19 @@
   async function saveSettings() {
     var payload = {
       name: document.getElementById('setName').value,
+      target_rate: document.getElementById('setTarget').value,
       min_fee: document.getElementById('setMinFee').value,
       batch_size: document.getElementById('setBatch').value
     };
     var btn = document.getElementById('setSave'); btn.disabled = true; btn.textContent = 'Saving…';
     try {
       var res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (res.ok) { applySettings((await res.json()).firm); closeSettings(); }
+      if (res.ok) {
+        applySettings((await res.json()).firm);
+        closeSettings();
+        loadClients(); loadOverview();
+        if (typeof loadDecide === 'function') loadDecide();
+      }
     } catch (e) { /* ignore */ }
     btn.disabled = false; btn.textContent = 'Save';
   }

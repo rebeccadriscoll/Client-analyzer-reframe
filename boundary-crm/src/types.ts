@@ -93,6 +93,10 @@ export interface Client {
   realized_rate: number | null;
   tier: Tier | null;
   flags: string | null;
+  /** 1 (low) .. 3 (high): cost beyond the fee (late pay, messy books, scope creep). */
+  risk_level: number | null;
+  /** 1 (low) .. 3 (high): value beyond the fee (referrals, tenure, growth). */
+  relationship_level: number | null;
   created_at: number;
 }
 
@@ -103,6 +107,8 @@ export interface Firm {
   created_at: number;
   min_fee: number | null;
   batch_size: number | null;
+  /** Target realized rate ($/hr). When set, tiers grade against it absolutely. */
+  target_rate: number | null;
 }
 
 export interface Season {

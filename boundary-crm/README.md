@@ -189,9 +189,48 @@ You confirm or adjust the mapping, see a live preview with realized rate, then i
   is present, an optional single LLM call refines only the low-confidence guesses; any
   failure falls back to the heuristic, so import never depends on the model.
 - **Realized rate** = `annual_fee / est_hours` (null when hours are missing/zero).
-- **Tier** is assigned by realized-rate percentile within the imported set: A = top 20%,
-  B = next 30%, C = next 30%, D = bottom 20%. Rows with no name are skipped; rows with no
-  fee/hours import but stay unranked.
+- **Tier** grades realized rate. With a **target rate** set (Settings), grading is
+  absolute: A >= 1.25x target, B >= target, C >= 0.6x target, else D, so a book of all
+  strong clients can be all A/B and "D" means genuinely below what the work should earn.
+  Without a target it falls back to percentile within the book (A top 20%, B 30%, C 30%,
+  D bottom 20%). Rows with no name are skipped; rows with no fee/hours import but stay
+  unranked. Setting or changing the target re-tiers the whole book.
+
+## Groom for sale (the book as an asset)
+
+For the wave of owners nearing retirement, the book is the retirement asset, and a clean,
+high-realization, low-concentration book sells for a higher multiple than a bloated one.
+The **Groom for sale** module (`GET /api/valuation`, `src/valuation.ts`) puts a rough
+practice value on the book, ~a multiple of recurring revenue that moves with the book's
+health, and shows exactly what lifts it:
+
+- **Estimated value range** and the multiple (small firms trade near 0.6x to 1.3x annual
+  recurring fees; the heuristic rewards A/B share and realized rate over target, and
+  discounts D-tier drag and client concentration).
+- **Levers**: reduce client concentration (a top client over ~15% of revenue gets
+  discounted by buyers), lift or release the D tier, close the gap to your target rate,
+  and clean up missing fees/hours before diligence.
+
+It is a defensible estimate for grooming decisions, clearly labeled as not a formal
+appraisal. This is the single-firm seed of a succession story; a buyer-matching network is
+a possible later step.
+
+## Decision factors and capacity
+
+Realized rate is not the whole story, so a client also carries two optional 1 (low) to 3
+(high) levels, set on the client card:
+
+- **Risk / pain** — what a client costs beyond the fee (late pay, messy books, scope creep).
+- **Relationship** — their value beyond the fee (referrals, tenure, growth).
+
+These bend the suggested call in Decide: a high-value relationship pulls a would-be goodbye
+back to a nudge; high pain turns a keep into a nudge (set boundaries) and can turn a thin,
+unvalued client into a goodbye. The reasoning line names the factor, so the call stays
+explainable.
+
+Because capacity, not demand, is the binding constraint in most firms right now, the Home
+dashboard leads with **Hours freed** (the hours handed back by the goodbyes) alongside the
+revenue figures, and the assistant can speak in those terms too.
 - **Adapter seam:** the importer is an `Importer` interface (`src/import/importer.ts`).
   Phase 0 ships only `SpreadsheetImporter`; QBO/TaxDome connectors implement the same
   interface later without touching mapping, tiering, or the write path.
@@ -223,7 +262,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/words/save` | POST | Save the final message (`{ client_id, message }`) |
 | `/api/words/handoff` | POST | Mint the confirm link + mark told, for the owner to send (`{ client_id }`) |
 | `/api/overview` | GET | Dashboard aggregates + suggested next step |
-| `/api/settings` | GET/POST | Firm name, minimum fee, default batch size |
+| `/api/settings` | GET/POST | Firm name, target rate, minimum fee, default batch size |
 | `/api/seasons` | GET | Past closed seasons |
 | `/api/seasons/close` | POST | Snapshot the cycle + clear it (`{ label }`) |
 | `/api/clients/create` | POST | Add a client by hand (re-tiers the book) |
@@ -237,6 +276,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/sample/load` | POST | Fill an empty book with demo clients to explore |
 | `/api/sample/clear` | POST | Remove just the demo clients |
 | `/api/handoffs` | GET | Transition packets for every client being let go |
+| `/api/valuation` | GET | Practice-value estimate + grooming levers |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
@@ -314,7 +354,7 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth … 0007 note; 0008 settings + season)
+  migrations/           D1 schema (0001 auth … 0008 settings + season; 0009 target rate + risk/relationship)
   src/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)
@@ -324,6 +364,7 @@ boundary-crm/
     words.ts            message templates + voice guardrail + optional LLM
     assistant.ts        in-app Claude assistant: firm-scoped tool-use loop
     handoff.ts          transition-packet builder for goodbyes
+    valuation.ts        practice-value estimate + grooming levers
     rollout.ts          wave order/labels + proposed-fee logic
     commit_page.ts      public commitment confirm page (HTML)
     import/
