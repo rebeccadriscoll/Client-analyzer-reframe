@@ -177,6 +177,9 @@ export default {
       if (pathname === "/api/assistant" && request.method === "POST") {
         return await handleAssistant(request, env);
       }
+      if (pathname === "/api/assistant/suggestions" && request.method === "GET") {
+        return await handleAssistantSuggestions(request, env);
+      }
       if (pathname === "/api/sample/load" && request.method === "POST") {
         return await handleSampleLoad(request, env);
       }
@@ -1155,6 +1158,41 @@ async function handleAssistant(request: Request, env: Env): Promise<Response> {
     console.error("assistant error:", err);
     return json({ error: "assistant_failed" }, 502);
   }
+}
+
+/** GET /api/assistant/suggestions — proactive "worth your attention" prompts. */
+async function handleAssistantSuggestions(request: Request, env: Env): Promise<Response> {
+  const firm = await firmFromRequest(request, env);
+  if (!firm) return json({ error: "unauthorized" }, 401);
+  const [clients, decisions, commitments] = await Promise.all([
+    listClients(env, firm.id),
+    getDecisions(env, firm.id),
+    getCommitments(env, firm.id),
+  ]);
+  const decided = new Set(decisions.map((d) => d.client_id));
+  const target = firm.target_rate;
+  const now = Date.now();
+
+  const undecided = clients.length - decisions.length;
+  const belowTarget = target
+    ? clients.filter((c) => c.realized_rate != null && c.realized_rate < target && !decided.has(c.id)).length
+    : 0;
+  const belowMarket = computeBenchmarks(clients).summary.below;
+  const missing = clients.filter((c) => c.annual_fee == null || !c.est_hours).length;
+  const silent = commitments.filter((c) => c.state === "told" && now - c.updated_at > 7 * 86400000).length;
+  const advisory = adviseGrow(clients, decisions).length;
+  const p = (n: number) => (n === 1 ? "" : "s");
+
+  const all = [
+    undecided > 0 && { label: `Decide on ${undecided} client${p(undecided)} still on the fence`, prompt: "Which of my clients are still undecided, and what do you suggest for each?" },
+    belowTarget > 0 && { label: `${belowTarget} client${p(belowTarget)} priced below your target`, prompt: "Which clients are priced below my target rate, and should I raise them?" },
+    advisory > 0 && { label: `${advisory} client${p(advisory)} look ready to grow`, prompt: "Which clients are good advisory or upsell candidates?" },
+    belowMarket > 0 && { label: `${belowMarket} client${p(belowMarket)} priced under market`, prompt: "Which clients are priced below the market range for their service?" },
+    silent > 0 && { label: `${silent} client${p(silent)} have gone silent`, prompt: "Who has gone silent and needs a follow-up?" },
+    missing > 0 && { label: `${missing} client${p(missing)} missing a fee or hours`, prompt: "Which clients are missing a fee or hours on file?" },
+  ].filter(Boolean) as Array<{ label: string; prompt: string }>;
+
+  return json({ suggestions: all.slice(0, 4) });
 }
 
 /** GET /c/:token — public confirm page. */

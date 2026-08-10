@@ -150,6 +150,13 @@ their book in plain English. It runs **Claude** through a server-side tool-use l
 app or set up an external connector. The whole thing lives behind `POST /api/assistant`
 (`{ messages }`, text only), which returns `{ reply, actions, ready }`.
 
+It also opens **proactively**: `GET /api/assistant/suggestions` computes a "Worth your
+attention" list from the live book, clients still undecided, priced below target, ready to
+grow (advisory), priced under market, gone silent, or missing data, and surfaces the top
+few as one-tap prompts at the top of the drawer. Tapping one sends that question into the
+assistant, which then uses its tools to answer or act. So Ask leads with what matters
+instead of waiting to be asked; when nothing needs attention it says you are caught up.
+
 Claude answers by calling firm-scoped tools, never by guessing:
 
 - `get_summary` — book size, tier mix, decisions made, committed and potential revenue,
@@ -380,6 +387,7 @@ real one. No migration: the demo marker reuses the existing `flags` column.
 | `/api/scenario` | POST | Model tier-wide pricing moves; before/after impact |
 | `/api/benchmarks` | GET | Each client's fee vs a market range for its service |
 | `/api/assistant` | POST | In-app Claude assistant, tool-use (`{ messages }`) |
+| `/api/assistant/suggestions` | GET | Proactive "worth your attention" prompts |
 | `/c/:token` | GET | **Public** commitment confirm page |
 | `/api/commit/:token` | POST | **Public** agree/decline (`{ response }`) |
 

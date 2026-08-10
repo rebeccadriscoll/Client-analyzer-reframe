@@ -837,6 +837,9 @@
     color: var(--navy); cursor: pointer; transition: border-color .12s ease, background .12s ease;
   }
   .ask-suggest button:hover { border-color: var(--coral); background: var(--coral-soft); }
+  .ask-proactive-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--coral-deep); margin: 14px 0 8px; }
+  .ask-suggest button.ask-prox { border-left: 3px solid var(--coral); font-weight: 600; }
+  .ask-suggest-alt button { font-size: 12px; color: var(--gray); padding: 8px 12px; }
   .ask-intro { font-size: 14px; color: var(--gray); margin-bottom: 12px; line-height: 1.55; }
   .ask-typing { font-size: 13px; color: var(--gray); font-style: italic; padding: 2px 4px; }
   .ask-foot { flex: 0 0 auto; padding: 12px; border-top: 1px solid var(--gray-light); background: var(--cream); }
@@ -3963,7 +3966,7 @@
   });
 
   // ---- Ask assistant ----
-  var askState = { messages: [], busy: false, open: false, greeted: false };
+  var askState = { messages: [], busy: false, open: false, greeted: false, proactive: [], proactiveLoaded: false };
   var ASK_SUGGESTIONS = [
     'Give me a summary of my book',
     'Which of my D-tier clients should I raise?',
@@ -3976,7 +3979,17 @@
     document.getElementById('askDrawer').classList.add('show');
     document.getElementById('askFab').classList.add('hidden');
     renderAsk();
+    loadAskProactive();
     setTimeout(function () { document.getElementById('askIn').focus(); }, 60);
+  }
+  async function loadAskProactive() {
+    try {
+      var res = await fetch('/api/assistant/suggestions');
+      if (!res.ok) return;
+      askState.proactive = (await res.json()).suggestions || [];
+      askState.proactiveLoaded = true;
+      if (askState.open && askState.messages.length === 0) renderAsk();
+    } catch (e) { /* ignore */ }
   }
   function closeAsk() {
     askState.open = false;
@@ -3992,8 +4005,17 @@
     if (askState.messages.length === 0) {
       html += '<div class="ask-intro">Hi. I can look across your clients and answer in plain English. ' +
         'When you ask, I can also record a decision, draft the message, mark who agreed or declined, and jot ' +
-        'a note. Nothing gets sent without you. Try one of these:</div>';
-      html += '<div class="ask-suggest">';
+        'a note. Nothing gets sent without you.</div>';
+      if (askState.proactive.length) {
+        html += '<div class="ask-proactive-lbl">Worth your attention</div><div class="ask-suggest">';
+        askState.proactive.forEach(function (s) {
+          html += '<button type="button" class="ask-prox" data-q="' + esc(s.prompt) + '">' + esc(s.label) + '</button>';
+        });
+        html += '</div>';
+      } else if (askState.proactiveLoaded) {
+        html += '<div class="ask-proactive-lbl">You are caught up. Try one of these:</div>';
+      }
+      html += '<div class="ask-suggest' + (askState.proactive.length ? ' ask-suggest-alt' : '') + '">';
       ASK_SUGGESTIONS.forEach(function (s) {
         html += '<button type="button" data-q="' + esc(s) + '">' + esc(s) + '</button>';
       });
