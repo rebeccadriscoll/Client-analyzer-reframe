@@ -259,6 +259,29 @@ range:
 Below-market clients are raise candidates the rate view alone can miss (a client can have
 a fine realized rate and still be underpriced against the market).
 
+### Benchmark network
+
+The seeded ranges are the fallback; the real product is aggregated data. A firm can opt in
+(Settings → **Contribute to the benchmark network**) to share its fees, and the Benchmarks
+tab then shows a **Network benchmarks** table: your average vs the pooled **median** and
+**25–75% range** per service, with the number of contributing firms. `src/network.ts`
+aggregates fees from every opted-in firm (`getContributedFees`), classifies each by
+service, and returns per-service percentiles.
+
+Privacy is built in: only **aggregate** percentiles ever leave the server, never a client
+or a firm, and a service is exposed only once it clears a floor (at least 2 distinct firms
+and 5 data points), so nothing can be de-anonymized. The network stats are visible to
+everyone, with a nudge to contribute; the value grows with adoption, which is the moat.
+
+### On live integrations (QBO / Xero / Ignition / TaxDome …)
+
+The import layer is already an adapter seam (`Importer` in `src/import/importer.ts`), so a
+practice-management or accounting connector implements the same interface without touching
+mapping, tiering, or the write path. The remaining work is a live OAuth handshake per
+provider, which needs an OAuth app, credentials on the deployed Worker, and a decision on
+which tool to build first, informed by asking target firms what they bill and track time
+in. That is a deploy-and-partner step, not something built in this repo yet.
+
 ## Grow, not just cut
 
 The profession's whole strategic push is up-market, from commodity compliance to advisory,
@@ -464,7 +487,7 @@ Click it to sign in.
 ```
 boundary-crm/
   wrangler.jsonc        Worker + assets + D1 + AI config
-  migrations/           D1 schema (0001 auth … 0009 target rate + risk/relationship; 0010 members + invites; 0011 season metrics)
+  migrations/           D1 schema (0001 auth … 0009 target rate + risk/relationship; 0010 members + invites; 0011 season metrics; 0012 benchmark sharing)
   src/
     index.ts            Worker router: auth, clients, import, decisions, words, rollout
     db.ts               D1 queries (firm, tokens, sessions, clients, decisions, waves, commitments)
@@ -479,6 +502,7 @@ boundary-crm/
     scenario.ts         what-if modeling of tier-wide pricing moves
     grow.ts             advisory-upsell candidates + outreach scripts
     benchmarks.ts       fee-vs-market service bands + comparison
+    network.ts          benchmark-network aggregation (privacy-floored percentiles)
     rollout.ts          wave order/labels + proposed-fee logic
     commit_page.ts      public commitment confirm page (HTML)
     import/

@@ -28,6 +28,7 @@ import {
   listSeasons,
   closeSeason,
   getTargetRate,
+  getContributedFees,
   retierFirm,
   type ClientFields,
   getDecisions,
@@ -54,6 +55,7 @@ import { adviseGrow } from "./grow";
 import { computeBenchmarks } from "./benchmarks";
 import { runScenario, type ScenarioLevers } from "./scenario";
 import { computeDataRoom } from "./dataroom";
+import { computeNetworkBenchmarks } from "./network";
 import { runAssistant, type ChatMessage } from "./assistant";
 import { WAVE_ORDER, WAVE_META, proposedFee } from "./rollout";
 import { renderCommitPage } from "./commit_page";
@@ -278,6 +280,7 @@ function firmPayload(firm: Firm, member: Member) {
     min_fee: firm.min_fee,
     batch_size: firm.batch_size,
     target_rate: firm.target_rate,
+    contribute_benchmarks: firm.contribute_benchmarks ? 1 : 0,
   };
 }
 
@@ -433,8 +436,9 @@ async function handleSettingsSave(request: Request, env: Env): Promise<Response>
   const batch_size = bsRaw != null ? Math.max(1, Math.round(bsRaw)) : null;
   const trRaw = numOrNull(body.target_rate);
   const target_rate = trRaw != null && trRaw > 0 ? trRaw : null;
+  const contribute_benchmarks = body.contribute_benchmarks ? 1 : null;
   const changedTarget = target_rate !== firm.target_rate;
-  const updated = await updateSettings(env, firm.id, { name, min_fee, batch_size, target_rate });
+  const updated = await updateSettings(env, firm.id, { name, min_fee, batch_size, target_rate, contribute_benchmarks });
   // The target rate changes how the whole book grades, so re-tier when it moves.
   if (changedTarget) await retierFirm(env, firm.id);
   return json({ firm: firmPayload(updated, ctx.member) });
@@ -767,12 +771,19 @@ async function handleValuation(request: Request, env: Env): Promise<Response> {
   return json(computeValuation(clients, firm.target_rate));
 }
 
-/** GET /api/benchmarks — each client's fee vs a market range for its service. */
+/** GET /api/benchmarks — each client's fee vs a market range, plus network stats. */
 async function handleBenchmarks(request: Request, env: Env): Promise<Response> {
   const firm = await firmFromRequest(request, env);
   if (!firm) return json({ error: "unauthorized" }, 401);
   const clients = await listClients(env, firm.id);
-  return json({ ...computeBenchmarks(clients), clients: clients.length });
+  const contributed = await getContributedFees(env);
+  const network = computeNetworkBenchmarks(contributed);
+  return json({
+    ...computeBenchmarks(clients),
+    clients: clients.length,
+    network,
+    contributing: !!firm.contribute_benchmarks,
+  });
 }
 
 /** POST /api/scenario { c, d, belowMarket } — model pricing moves, no writes. */
