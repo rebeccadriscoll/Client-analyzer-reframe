@@ -1,12 +1,17 @@
-import type { Env, Firm } from "./types";
+import type { Env, Firm, Member } from "./types";
 import { parseCookies } from "./crypto";
 import {
-  getOrCreateFirm,
+  resolveMemberForSignin,
   createMagicToken,
   consumeMagicToken,
   createSession,
-  getFirmBySession,
+  getSessionContext,
   deleteSession,
+  listMembers,
+  listInvites,
+  inviteMember,
+  cancelInvite,
+  removeMember,
   insertClients,
   listClients,
   deleteClientsForFirm,
@@ -113,6 +118,18 @@ export default {
       if (pathname === "/api/settings" && request.method === "POST") {
         return await handleSettingsSave(request, env);
       }
+      if (pathname === "/api/team" && request.method === "GET") {
+        return await handleTeamList(request, env);
+      }
+      if (pathname === "/api/team/invite" && request.method === "POST") {
+        return await handleTeamInvite(request, env);
+      }
+      if (pathname === "/api/team/uninvite" && request.method === "POST") {
+        return await handleTeamUninvite(request, env);
+      }
+      if (pathname === "/api/team/remove" && request.method === "POST") {
+        return await handleTeamRemove(request, env);
+      }
       if (pathname === "/api/seasons" && request.method === "GET") {
         return await handleSeasonsList(request, env);
       }
@@ -204,11 +221,11 @@ async function handleAuthRequest(request: Request, env: Env, url: URL): Promise<
       : "";
   if (!isValidEmail(email)) return json({ error: "invalid_email" }, 400);
 
-  const firm = await getOrCreateFirm(env, email);
-  const rawToken = await createMagicToken(env, firm.id);
+  const member = await resolveMemberForSignin(env, email);
+  const rawToken = await createMagicToken(env, member.firm_id, member.id);
   const base = (env.APP_URL || url.origin).replace(/\/$/, "");
   const link = `${base}/auth/verify?token=${rawToken}`;
-  const result = await sendMagicLink(env, firm.owner_email, link);
+  const result = await sendMagicLink(env, member.email, link);
 
   // Response shape is identical whether or not the firm already existed, so it
   // never reveals which emails have accounts. devLink is only ever set in dev.
@@ -221,10 +238,10 @@ async function handleVerify(env: Env, url: URL): Promise<Response> {
   const token = url.searchParams.get("token");
   if (!token) return redirect(`${base}/?auth=invalid`);
 
-  const firmId = await consumeMagicToken(env, token);
-  if (!firmId) return redirect(`${base}/?auth=invalid`);
+  const consumed = await consumeMagicToken(env, token);
+  if (!consumed) return redirect(`${base}/?auth=invalid`);
 
-  const session = await createSession(env, firmId);
+  const session = await createSession(env, consumed.firm_id, consumed.member_id);
   const headers = new Headers({ Location: `${base}/` });
   headers.append("Set-Cookie", sessionCookie(session, SESSION_MAX_AGE));
   return new Response(null, { status: 302, headers });
@@ -232,13 +249,21 @@ async function handleVerify(env: Env, url: URL): Promise<Response> {
 
 /** GET /api/me — who is signed in for this session. */
 async function handleMe(request: Request, env: Env): Promise<Response> {
-  const cookies = parseCookies(request.headers.get("Cookie"));
-  const firm = await getFirmBySession(env, cookies[SESSION_COOKIE]);
-  if (!firm) return json({ authenticated: false }, 401);
-  return json({
-    authenticated: true,
-    firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size, target_rate: firm.target_rate },
-  });
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ authenticated: false }, 401);
+  return json({ authenticated: true, firm: firmPayload(ctx.firm, ctx.member) });
+}
+
+/** The firm shape the frontend consumes: settings plus the signed-in member. */
+function firmPayload(firm: Firm, member: Member) {
+  return {
+    email: member.email,
+    role: member.role,
+    name: firm.name,
+    min_fee: firm.min_fee,
+    batch_size: firm.batch_size,
+    target_rate: firm.target_rate,
+  };
 }
 
 /** POST /api/auth/logout — revoke the session and clear the cookie. */
@@ -250,10 +275,16 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
+/** Resolve the firm + acting member from the session cookie, or null. */
+async function sessionFromRequest(request: Request, env: Env): Promise<{ firm: Firm; member: Member } | null> {
+  const cookies = parseCookies(request.headers.get("Cookie"));
+  return getSessionContext(env, cookies[SESSION_COOKIE]);
+}
+
 /** Resolve the signed-in firm from the session cookie, or null. */
 async function firmFromRequest(request: Request, env: Env): Promise<Firm | null> {
-  const cookies = parseCookies(request.headers.get("Cookie"));
-  return getFirmBySession(env, cookies[SESSION_COOKIE]);
+  const ctx = await sessionFromRequest(request, env);
+  return ctx?.firm ?? null;
 }
 
 /** GET /api/clients — the firm's clients with a tier breakdown. */
@@ -363,15 +394,16 @@ async function handleNotesAdd(request: Request, env: Env): Promise<Response> {
 
 /** GET /api/settings — firm-level settings. */
 async function handleSettingsGet(request: Request, env: Env): Promise<Response> {
-  const firm = await firmFromRequest(request, env);
-  if (!firm) return json({ error: "unauthorized" }, 401);
-  return json({ firm: { email: firm.owner_email, name: firm.name, min_fee: firm.min_fee, batch_size: firm.batch_size, target_rate: firm.target_rate } });
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ error: "unauthorized" }, 401);
+  return json({ firm: firmPayload(ctx.firm, ctx.member) });
 }
 
 /** POST /api/settings { name?, min_fee?, batch_size? } — save firm settings. */
 async function handleSettingsSave(request: Request, env: Env): Promise<Response> {
-  const firm = await firmFromRequest(request, env);
-  if (!firm) return json({ error: "unauthorized" }, 401);
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ error: "unauthorized" }, 401);
+  const firm = ctx.firm;
   const body = await readJson(request);
   if (!body) return json({ error: "bad_request" }, 400);
   const numOrNull = (v: unknown) => {
@@ -389,7 +421,61 @@ async function handleSettingsSave(request: Request, env: Env): Promise<Response>
   const updated = await updateSettings(env, firm.id, { name, min_fee, batch_size, target_rate });
   // The target rate changes how the whole book grades, so re-tier when it moves.
   if (changedTarget) await retierFirm(env, firm.id);
-  return json({ firm: { email: updated.owner_email, name: updated.name, min_fee: updated.min_fee, batch_size: updated.batch_size, target_rate: updated.target_rate } });
+  return json({ firm: firmPayload(updated, ctx.member) });
+}
+
+/** GET /api/team — members + pending invites, plus who you are. */
+async function handleTeamList(request: Request, env: Env): Promise<Response> {
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ error: "unauthorized" }, 401);
+  return json(await teamPayload(env, ctx.firm.id, ctx.member));
+}
+
+async function teamPayload(env: Env, firmId: string, me: Member) {
+  const [members, invites] = await Promise.all([listMembers(env, firmId), listInvites(env, firmId)]);
+  return {
+    me: { id: me.id, email: me.email, role: me.role },
+    members: members.map((m) => ({ id: m.id, email: m.email, role: m.role })),
+    invites: invites.map((i) => ({ email: i.email, role: i.role })),
+  };
+}
+
+/** POST /api/team/invite { email } — owner invites someone to the firm. */
+async function handleTeamInvite(request: Request, env: Env): Promise<Response> {
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ error: "unauthorized" }, 401);
+  if (ctx.member.role !== "owner") return json({ error: "forbidden" }, 403);
+  const body = await readJson(request);
+  const email = body && typeof body.email === "string" ? body.email.trim() : "";
+  if (!isValidEmail(email)) return json({ error: "invalid_email" }, 400);
+  const err = await inviteMember(env, ctx.firm.id, email);
+  if (err) return json({ error: err }, 409);
+  return json(await teamPayload(env, ctx.firm.id, ctx.member));
+}
+
+/** POST /api/team/uninvite { email } — owner cancels a pending invite. */
+async function handleTeamUninvite(request: Request, env: Env): Promise<Response> {
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ error: "unauthorized" }, 401);
+  if (ctx.member.role !== "owner") return json({ error: "forbidden" }, 403);
+  const body = await readJson(request);
+  const email = body && typeof body.email === "string" ? body.email.trim() : "";
+  if (!email) return json({ error: "bad_request" }, 400);
+  await cancelInvite(env, ctx.firm.id, email);
+  return json(await teamPayload(env, ctx.firm.id, ctx.member));
+}
+
+/** POST /api/team/remove { member_id } — owner removes a member (not an owner). */
+async function handleTeamRemove(request: Request, env: Env): Promise<Response> {
+  const ctx = await sessionFromRequest(request, env);
+  if (!ctx) return json({ error: "unauthorized" }, 401);
+  if (ctx.member.role !== "owner") return json({ error: "forbidden" }, 403);
+  const body = await readJson(request);
+  const memberId = body && typeof body.member_id === "string" ? body.member_id : "";
+  if (!memberId) return json({ error: "bad_request" }, 400);
+  if (memberId === ctx.member.id) return json({ error: "cannot_remove_self" }, 400);
+  await removeMember(env, ctx.firm.id, memberId);
+  return json(await teamPayload(env, ctx.firm.id, ctx.member));
 }
 
 /** GET /api/seasons — past closed seasons. */

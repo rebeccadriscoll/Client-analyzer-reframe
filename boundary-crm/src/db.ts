@@ -1,6 +1,7 @@
 import type {
   Env, Firm, Client, Tier, Action, Decision,
   Wave, WaveType, WaveStatus, Commitment, CommitmentState, VoiceSample, Note, Season,
+  Member, FirmInvite, MemberRole,
 } from "./types";
 import { randomToken, sha256Hex } from "./crypto";
 import { realizedRate, computeTiers } from "./scoring";
@@ -35,6 +36,84 @@ export async function getOrCreateFirm(env: Env, rawEmail: string): Promise<Firm>
     .bind(firm.id, firm.owner_email, firm.name, firm.created_at)
     .run();
   return firm;
+}
+
+/**
+ * Resolve the member for a signing-in email: an existing member, or a pending
+ * invite turned into a member, or a brand-new firm with this email as owner.
+ */
+export async function resolveMemberForSignin(env: Env, rawEmail: string): Promise<Member> {
+  const email = normalizeEmail(rawEmail);
+  const existing = await env.DB.prepare("SELECT * FROM member WHERE email = ?").bind(email).first<Member>();
+  if (existing) return existing;
+
+  const invite = await env.DB.prepare("SELECT * FROM firm_invite WHERE email = ?")
+    .bind(email)
+    .first<FirmInvite>();
+  if (invite) {
+    const member: Member = {
+      id: crypto.randomUUID(),
+      firm_id: invite.firm_id,
+      email,
+      role: (invite.role as MemberRole) || "member",
+      created_at: Date.now(),
+    };
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO member (id, firm_id, email, role, created_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(member.id, member.firm_id, member.email, member.role, member.created_at),
+      env.DB.prepare("DELETE FROM firm_invite WHERE id = ?").bind(invite.id),
+    ]);
+    return member;
+  }
+
+  const firm = await getOrCreateFirm(env, email);
+  const owner: Member = { id: crypto.randomUUID(), firm_id: firm.id, email, role: "owner", created_at: Date.now() };
+  await env.DB.prepare("INSERT INTO member (id, firm_id, email, role, created_at) VALUES (?, ?, ?, ?, ?)")
+    .bind(owner.id, firm.id, owner.email, owner.role, owner.created_at)
+    .run();
+  return owner;
+}
+
+// ---- team ----
+
+export async function listMembers(env: Env, firmId: string): Promise<Member[]> {
+  const res = await env.DB.prepare("SELECT * FROM member WHERE firm_id = ? ORDER BY (role = 'owner') DESC, created_at ASC")
+    .bind(firmId)
+    .all<Member>();
+  return res.results ?? [];
+}
+
+export async function listInvites(env: Env, firmId: string): Promise<FirmInvite[]> {
+  const res = await env.DB.prepare("SELECT * FROM firm_invite WHERE firm_id = ? ORDER BY created_at ASC")
+    .bind(firmId)
+    .all<FirmInvite>();
+  return res.results ?? [];
+}
+
+/** Invite an email to a firm. Returns an error code, or null on success. */
+export async function inviteMember(env: Env, firmId: string, rawEmail: string): Promise<string | null> {
+  const email = normalizeEmail(rawEmail);
+  const existingMember = await env.DB.prepare("SELECT firm_id FROM member WHERE email = ?").bind(email).first<{ firm_id: string }>();
+  if (existingMember) return existingMember.firm_id === firmId ? "already_member" : "in_other_firm";
+  const existingInvite = await env.DB.prepare("SELECT firm_id FROM firm_invite WHERE email = ?").bind(email).first<{ firm_id: string }>();
+  if (existingInvite) return existingInvite.firm_id === firmId ? "already_invited" : "invited_elsewhere";
+  await env.DB.prepare("INSERT INTO firm_invite (id, firm_id, email, role, created_at) VALUES (?, ?, ?, 'member', ?)")
+    .bind(crypto.randomUUID(), firmId, email, Date.now())
+    .run();
+  return null;
+}
+
+export async function cancelInvite(env: Env, firmId: string, rawEmail: string): Promise<void> {
+  await env.DB.prepare("DELETE FROM firm_invite WHERE firm_id = ? AND email = ?")
+    .bind(firmId, normalizeEmail(rawEmail))
+    .run();
+}
+
+/** Remove a member from a firm. Owners cannot be removed here. */
+export async function removeMember(env: Env, firmId: string, memberId: string): Promise<void> {
+  await env.DB.prepare("DELETE FROM member WHERE id = ? AND firm_id = ? AND role != 'owner'")
+    .bind(memberId, firmId)
+    .run();
 }
 
 /** Update firm-level settings. */
@@ -99,27 +178,30 @@ export async function closeSeason(
 }
 
 /** Issue a single-use magic-link token, returning the raw value (only the hash is stored). */
-export async function createMagicToken(env: Env, firmId: string): Promise<string> {
+export async function createMagicToken(env: Env, firmId: string, memberId: string): Promise<string> {
   const raw = randomToken();
   const hash = await sha256Hex(raw);
   const now = Date.now();
   await env.DB.prepare(
-    "INSERT INTO magic_link_token (id, firm_id, token_hash, expires_at, consumed_at, created_at) VALUES (?, ?, ?, ?, NULL, ?)"
+    "INSERT INTO magic_link_token (id, firm_id, token_hash, expires_at, consumed_at, created_at, member_id) VALUES (?, ?, ?, ?, NULL, ?, ?)"
   )
-    .bind(crypto.randomUUID(), firmId, hash, now + MAGIC_TTL_MS, now)
+    .bind(crypto.randomUUID(), firmId, hash, now + MAGIC_TTL_MS, now, memberId)
     .run();
   return raw;
 }
 
-/** Validate + atomically consume a magic-link token. Returns the firm id or null. */
-export async function consumeMagicToken(env: Env, rawToken: string): Promise<string | null> {
+/** Validate + atomically consume a magic-link token. Returns firm + member ids, or null. */
+export async function consumeMagicToken(
+  env: Env,
+  rawToken: string
+): Promise<{ firm_id: string; member_id: string | null } | null> {
   const hash = await sha256Hex(rawToken);
   const now = Date.now();
   const row = await env.DB.prepare(
-    "SELECT id, firm_id, expires_at, consumed_at FROM magic_link_token WHERE token_hash = ?"
+    "SELECT id, firm_id, member_id, expires_at, consumed_at FROM magic_link_token WHERE token_hash = ?"
   )
     .bind(hash)
-    .first<{ id: string; firm_id: string; expires_at: number; consumed_at: number | null }>();
+    .first<{ id: string; firm_id: string; member_id: string | null; expires_at: number; consumed_at: number | null }>();
 
   if (!row) return null;
   if (row.consumed_at !== null) return null;
@@ -132,33 +214,60 @@ export async function consumeMagicToken(env: Env, rawToken: string): Promise<str
     .bind(now, row.id)
     .run();
   if (!res.meta.changes) return null;
-  return row.firm_id;
+  return { firm_id: row.firm_id, member_id: row.member_id };
 }
 
 /** Create a session, returning the raw token for the httpOnly cookie. */
-export async function createSession(env: Env, firmId: string): Promise<string> {
+export async function createSession(env: Env, firmId: string, memberId: string | null): Promise<string> {
   const raw = randomToken();
   const hash = await sha256Hex(raw);
   const now = Date.now();
   await env.DB.prepare(
-    "INSERT INTO session (id, firm_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO session (id, firm_id, token_hash, expires_at, created_at, member_id) VALUES (?, ?, ?, ?, ?, ?)"
   )
-    .bind(crypto.randomUUID(), firmId, hash, now + SESSION_TTL_MS, now)
+    .bind(crypto.randomUUID(), firmId, hash, now + SESSION_TTL_MS, now, memberId)
     .run();
   return raw;
 }
 
 /** Resolve a session cookie to its firm, or null if missing/expired. */
 export async function getFirmBySession(env: Env, rawToken: string | undefined): Promise<Firm | null> {
+  const ctx = await getSessionContext(env, rawToken);
+  return ctx?.firm ?? null;
+}
+
+/** Resolve a session cookie to the firm and the acting member (who is signed in). */
+export async function getSessionContext(
+  env: Env,
+  rawToken: string | undefined
+): Promise<{ firm: Firm; member: Member } | null> {
   if (!rawToken) return null;
   const hash = await sha256Hex(rawToken);
   const row = await env.DB.prepare(
-    `SELECT f.* FROM session s JOIN firm f ON f.id = s.firm_id
+    `SELECT f.*, s.member_id AS session_member_id FROM session s JOIN firm f ON f.id = s.firm_id
      WHERE s.token_hash = ? AND s.expires_at > ?`
   )
     .bind(hash, Date.now())
-    .first<Firm>();
-  return row ?? null;
+    .first<Firm & { session_member_id: string | null }>();
+  if (!row) return null;
+  const { session_member_id, ...firm } = row;
+
+  let member: Member | null = null;
+  if (session_member_id) {
+    member = await env.DB.prepare("SELECT * FROM member WHERE id = ? AND firm_id = ?")
+      .bind(session_member_id, firm.id)
+      .first<Member>();
+  }
+  // Legacy session (no member_id) or a removed member: fall back to the firm owner.
+  if (!member) {
+    member = await env.DB.prepare(
+      "SELECT * FROM member WHERE firm_id = ? ORDER BY (role = 'owner') DESC, created_at ASC LIMIT 1"
+    )
+      .bind(firm.id)
+      .first<Member>();
+  }
+  if (!member) return null;
+  return { firm: firm as Firm, member };
 }
 
 /** Revoke a session (logout). */
@@ -205,6 +314,7 @@ export async function insertClients(env: Env, firmId: string, news: NewClient[])
     flags: null,
     risk_level: null,
     relationship_level: null,
+    owner_member_id: null,
     created_at: now,
   }));
 
@@ -341,6 +451,7 @@ export async function createClient(env: Env, firmId: string, f: ClientFields): P
     flags: null,
     risk_level: level(f.risk_level),
     relationship_level: level(f.relationship_level),
+    owner_member_id: null,
     created_at: Date.now(),
   };
   await env.DB.prepare(
